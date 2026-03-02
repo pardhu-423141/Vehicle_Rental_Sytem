@@ -1,29 +1,33 @@
-import { useState, type FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { JSX } from 'react';
 
-export default function Register(): JSX.Element {
-  const [name, setName] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
+export default function Register() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    console.log("Register Attempt:", { name, email, password });
-    alert("Registration logic coming soon!");
+    console.log("Register:", { name, email, password });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Create Account</h2>
+    <div 
+      className="min-h-screen flex items-center justify-center bg-cover bg-center"
+      style={{ backgroundImage: "url('https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=2000&auto=format&fit=crop')" }}
+    >
+      <div className="absolute inset-0 bg-black/40"></div>
+
+      <div className="relative z-10 w-full max-w-md p-8 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-xl">
+        <h2 className="text-3xl font-bold text-center text-white mb-2">Create Account</h2>
+        <p className="text-center text-gray-200 mb-8">Join us and start driving today</p>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-gray-700 font-medium mb-1">Full Name</label>
+            <label className="block text-gray-200 text-sm font-medium mb-2">Full Name</label>
             <input 
               type="text" 
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
               placeholder="John Doe"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -32,10 +36,10 @@ export default function Register(): JSX.Element {
           </div>
 
           <div>
-            <label className="block text-gray-700 font-medium mb-1">Email</label>
+            <label className="block text-gray-200 text-sm font-medium mb-2">Email Address</label>
             <input 
               type="email" 
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -44,10 +48,10 @@ export default function Register(): JSX.Element {
           </div>
 
           <div>
-            <label className="block text-gray-700 font-medium mb-1">Password</label>
+            <label className="block text-gray-200 text-sm font-medium mb-2">Password</label>
             <input 
               type="password" 
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -55,14 +59,22 @@ export default function Register(): JSX.Element {
             />
           </div>
 
-          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700 transition">
-            Register
+          <button 
+            type="submit" 
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg transition duration-300 transform hover:scale-[1.02]"
+          >
+            Sign Up
           </button>
         </form>
 
-        <p className="text-center text-gray-600 mt-4">
-          Already have an account? <Link to="/login" className="text-blue-600 hover:underline">Log in</Link>
-        </p>
+        <div className="mt-6 text-center">
+          <p className="text-gray-200">
+            Already have an account?{' '}
+            <Link to="/login" className="text-blue-300 hover:text-white font-semibold underline decoration-transparent hover:decoration-white transition">
+              Log in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

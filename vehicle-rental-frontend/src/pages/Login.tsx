@@ -1,29 +1,34 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { FormEvent, JSX } from 'react';
 
-export default function Login(): JSX.Element {
-  // Explicitly typing state as strings
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    console.log("Login Attempt:", { email, password });
-    alert("Login functionality will be connected to Backend later!");
+    console.log("Login:", { email, password });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Welcome Back</h2>
+    <div 
+      className="min-h-screen flex items-center justify-center bg-cover bg-center"
+      style={{ backgroundImage: "url('https://images.unsplash.com/photo-1485291571150-772bcfc10da5?q=80&w=2000&auto=format&fit=crop')" }}
+    >
+      {/* Overlay to darken background slightly for better contrast */}
+      <div className="absolute inset-0 bg-black/40"></div>
+
+      {/* Glass Card */}
+      <div className="relative z-10 w-full max-w-md p-8 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-xl">
+        <h2 className="text-3xl font-bold text-center text-white mb-2">Welcome Back</h2>
+        <p className="text-center text-gray-200 mb-8">Sign in to continue your journey</p>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-gray-700 font-medium mb-1">Email</label>
+            <label className="block text-gray-200 text-sm font-medium mb-2">Email Address</label>
             <input 
               type="email" 
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -32,10 +37,10 @@ export default function Login(): JSX.Element {
           </div>
 
           <div>
-            <label className="block text-gray-700 font-medium mb-1">Password</label>
+            <label className="block text-gray-200 text-sm font-medium mb-2">Password</label>
             <input 
               type="password" 
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -43,14 +48,22 @@ export default function Login(): JSX.Element {
             />
           </div>
 
-          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700 transition">
-            Login
+          <button 
+            type="submit" 
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg transition duration-300 transform hover:scale-[1.02]"
+          >
+            Sign In
           </button>
         </form>
 
-        <p className="text-center text-gray-600 mt-4">
-          Don't have an account? <Link to="/register" className="text-blue-600 hover:underline">Sign up</Link>
-        </p>
+        <div className="mt-6 text-center">
+          <p className="text-gray-200">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-blue-300 hover:text-white font-semibold underline decoration-transparent hover:decoration-white transition">
+              Create one
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
