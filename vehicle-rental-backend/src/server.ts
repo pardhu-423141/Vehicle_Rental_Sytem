@@ -1,22 +1,17 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import cookieParser from 'cookie-parser';
+import authRoutes from './routes/auth.routes';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
+// Middlewares
+app.use(cors({ origin: 'http://localhost:5173', credentials: true })); // React port
 app.use(express.json());
+app.use(cookieParser());
 
-// Test Route
-app.get('/', (req: Request, res: Response) => {
-  res.send('🚗 Vehicle Rental API is Running!');
-});
+// Use the Auth Routes
+app.use('/api/auth', authRoutes);
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+const PORT = 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
