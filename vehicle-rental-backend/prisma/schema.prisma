@@ -30,4 +30,105 @@ model User {
   isVerified  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  bookings    Booking[]
+  reviews     Review[]
+  kycData     KYCData?
+}
+
+model Vehicle {
+  id            String    @id @default(uuid())
+  make          String    // e.g., Toyota
+  model         String    // e.g., Camry
+  year          Int
+  licensePlate  String    @unique
+  color         String
+  fuelType      String    // Petrol, Diesel, Electric
+  transmission  String    // Manual, Automatic
+  rentalRate    Float     // Price per day/hour
+  imageUrl      String?
+  
+  // Status & Soft Delete Logic
+  status        String    @default("available") // available, rented, maintenance
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime? // Null means active. A date means "removed" but kept in history.
+  bookings    Booking[]
+  reviews     Review[]
+}
+
+model Booking {
+  id              String   @id @default(uuid())
+  userId          String
+  vehicleId       String
+  startDate       DateTime
+  endDate         DateTime
+  totalPrice      Float
+  status          BookingStatus @default(PENDING)
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id])
+  payment         Payment? // One-to-one relationship with Payment
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  bookingId       String        @unique
+  amount          Float
+  paymentMethod   String        // e.g., "STRIPE", "PAYPAL", "CREDIT_CARD"
+  status          PaymentStatus @default(PENDING)
+  transactionId   String?       @unique // ID from the payment gateway
+  
+  // Relations
+  booking         Booking       @relation(fields: [bookingId], references: [id])
+  
+  createdAt       DateTime      @default(now())
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+
+model Review {
+  id          String   @id @default(uuid())
+  rating      Int      // 1 to 5
+  comment     String?
+  userId      String
+  vehicleId   String
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id])
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+model KYCData {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  idType         String   // e.g., "Driving License", "Passport"
+  idNumber       String   @unique
+  idImageFront   String   // URL to image storage (S3/Cloudinary)
+  idImageBack    String?
+  
+  // Relations
+  user           User     @relation(fields: [userId], references: [id])
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

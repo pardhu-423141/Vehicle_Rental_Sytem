@@ -1,24 +1,41 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
+import { Role } from '@prisma/client';
+import { UserPayload } from '../types'; // Import the interface we created above
 
-export const protect = (allowedRoles: string[]) => {
+// 1. General Authentication (Checks if user is logged in)
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  const token = req.cookies.auth_token;
+
+  if (!token) {
+    return res.status(401).json({ message: "Authentication required: Please log in" });
+  }
+
+  try {
+    const decoded = verifyToken(token) as UserPayload;
+    req.user = decoded; // Now properly typed
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Invalid or expired session" });
+  }
+};
+
+// 2. Role Authorization (Checks if user has the right role)
+export const authorize = (allowedRoles: Role[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const token = req.cookies.auth_token;
-
-    if (!token) return res.status(401).json({ message: "Not logged in" });
-
-    try {
-      const decoded = verifyToken(token) as any;
-      
-      // Check if user's role is allowed for this specific route
-      if (!allowedRoles.includes(decoded.role)) {
-        return res.status(403).json({ message: "Access Denied: Insufficient Permissions" });
-      }
-
-      (req as any).user = decoded;
-      next();
-    } catch (error) {
-      return res.status(401).json({ message: "Invalid session" });
+    if (!req.user) {
+      return res.status(401).json({ message: "User not authenticated" });
     }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        message: `Access Denied: Requires one of these roles: [${allowedRoles.join(", ")}]` 
+      });
+    }
+
+    next();
   };
 };
+
+// 3. Admin Shortcut (Specifically for your vehicle removal requirement)
+export const isAdmin = authorize([Role.ADMIN]);
