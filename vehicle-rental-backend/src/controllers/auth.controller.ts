@@ -66,7 +66,7 @@ export const registerUser = async (req: Request, res: Response) => {
         name,
         email,
         password: hashedPassword,
-        role: role || 'USER', // Prisma uses the Enum we defined in schema.prisma
+        role: 'USER', // Prisma uses the Enum we defined in schema.prisma.hardcoded to 'USER' for all new registrations
       },
       // We 'select' only what we want to send back (safety first, no password!)
       select: {

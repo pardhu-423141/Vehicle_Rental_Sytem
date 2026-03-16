@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
+import { Role } from '@prisma/client';
+import { db } from '../config/db'; 
 // Extend Request type to include the user object from your auth middleware
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -20,7 +18,7 @@ export const addVehicle = async (req: AuthenticatedRequest, res: Response) => {
       fuelType, transmission, rentalRate, imageUrl 
     } = req.body;
 
-    const newVehicle = await prisma.Vehicle.create({
+    const newVehicle = await db.vehicle.create({
       data: {
         make,
         model,
@@ -44,9 +42,9 @@ export const addVehicle = async (req: AuthenticatedRequest, res: Response) => {
 export const updateVehicle = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   try {
-    const updated = await prisma.Vehicle.update({
+    const updated = await db.vehicle.update({
       where: { id },
-      data: req.body,
+      data: req.body, // Make sure to validate this in a real app!
     });
     res.status(200).json(updated);
   } catch (error) {
@@ -59,7 +57,7 @@ export const removeVehicle = async (req: AuthenticatedRequest, res: Response) =>
   const { id } = req.params;
   try {
     // We don't delete from DB, we just set the deletedAt timestamp
-    await prisma.Vehicle.update({
+    await db.vehicle.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
@@ -75,7 +73,7 @@ export const getVehicles = async (req: AuthenticatedRequest, res: Response) => {
   const isAdmin = req.user?.role === Role.ADMIN;
   
   try {
-    const vehicles = await prisma.Vehicle.findMany({
+    const vehicles = await db.vehicle.findMany({
       where: isAdmin 
         ? {} // Admins see everything (Past history included)
         : { deletedAt: null } // Users see only those NOT removed

@@ -9,7 +9,7 @@ cron.schedule('0 0 * * *', async () => {
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
   try {
-    const deleted = await prisma.Vehicle.deleteMany({
+    const deleted = await prisma.vehicle.deleteMany({
       where: {
         deletedAt: {
           lte: sixMonthsAgo, // "Less than or equal to" 6 months ago
