@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
-import { db } from '../config/db'; 
-import { Role } from '@prisma/client';
+import { db } from '../config/db';
 
 // 1. GET ALL USERS (with Pagination)
 export const getAllUsers = async (req: Request, res: Response) => {
@@ -44,9 +43,10 @@ export const getAllUsers = async (req: Request, res: Response) => {
 export const updateUserRole = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { role } = req.body; // Expects USER, USER_MANAGER, VEHICLE_MANAGER, or ADMIN
+  const validRoles = ['USER', 'USER_MANAGER', 'VEHICLE_MANAGER', 'ADMIN'];
 
   try {
-    if (!Object.values(Role).includes(role)) {
+    if (!validRoles.includes(role)) {
       return res.status(400).json({ message: "Invalid role specified" });
     }
 
@@ -195,7 +195,7 @@ export const getRevenueReports = async (req: Request, res: Response) => {
 
     // Fetch vehicle names for the top earners
     const vehicleDetails = await Promise.all(
-      topVehicles.map(async (item) => {
+      topVehicles.map(async (item: { vehicleId: any; _sum: { totalPrice: any; }; _count: { id: any; }; }) => {
         const vehicle = await db.vehicle.findUnique({
           where: { id: item.vehicleId },
           select: { make: true, model: true }

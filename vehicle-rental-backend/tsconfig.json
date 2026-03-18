@@ -3,9 +3,10 @@
     "target": "es2016",
     "module": "commonjs",
     "rootDir": ".",
-    "outDir": "./dist",         /* <-- IMPORTANT */
+    "outDir": "./dist",
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*", "src/server.ts"]
 }

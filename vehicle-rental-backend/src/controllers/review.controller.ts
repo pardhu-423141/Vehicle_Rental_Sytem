@@ -1,6 +1,5 @@
 import { Response } from 'express';
 import { db } from '../config/db'; // Using your Prisma 7 adapter
-import { Role } from '@prisma/client';
 
 /**
  * Handles the logic for vehicle ratings and feedback.
@@ -88,7 +87,7 @@ export const deleteReview = async (req: any, res: Response) => {
     }
 
     // Authorization: Author of the review or an ADMIN
-    if (review.userId !== userId && userRole !== Role.ADMIN) {
+    if (review.userId !== userId && userRole !== 'ADMIN') {
       return res.status(403).json({ message: "Unauthorized to delete this review." });
     }
 
@@ -97,5 +96,19 @@ export const deleteReview = async (req: any, res: Response) => {
     res.status(200).json({ message: "Review deleted successfully." });
   } catch (error) {
     res.status(500).json({ message: "Deletion failed." });
+  }
+};
+
+// Missing member fix for user.routes.ts
+export const getMyReviews = async (req: any, res: Response) => {
+  try {
+    const reviews = await db.review.findMany({
+      where: { userId: req.user.id },
+      include: { vehicle: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.status(200).json(reviews);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch your reviews" });
   }
 };

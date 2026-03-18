@@ -1,6 +1,5 @@
 import { Response } from 'express';
 import { db } from '../config/db'; // Using your Prisma 7 adapter
-import { KYCStatus } from '@prisma/client';
 
 /**
  * Handles the logic for User Identity Verification (KYC)
@@ -66,8 +65,9 @@ export const updateKYCStatus = async (req: any, res: Response) => {
   const { status } = req.body; // Expects 'APPROVED' or 'REJECTED'
 
   try {
-    // Validate the status input against the Prisma Enum
-    if (!Object.values(KYCStatus).includes(status)) {
+    // Validate the status input
+    const validStatuses = ['PENDING', 'APPROVED', 'REJECTED'];
+    if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status value." });
     }
 

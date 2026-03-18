@@ -1,6 +1,5 @@
 import { Response } from 'express';
 import { db } from '../config/db'; // Using your Prisma 7 adapter instance
-import { Role } from '@prisma/client';
 
 /**
  * Interface to handle the extended Express Request 
@@ -9,7 +8,7 @@ import { Role } from '@prisma/client';
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
-    role: Role;
+    role: string;
     email: string;
   };
 }
@@ -106,5 +105,19 @@ export const cancelBooking = async (req: any, res: Response) => {
     res.status(200).json({ message: "Booking cancelled successfully", updated });
   } catch (error) {
     res.status(500).json({ message: "Cancellation failed." });
+  }
+};
+
+// Missing member fix for user.routes.ts
+export const getBookingHistory = async (req: any, res: Response) => {
+  try {
+    const history = await db.booking.findMany({
+      where: { userId: req.user.id },
+      include: { vehicle: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.status(200).json(history);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch booking history" });
   }
 };

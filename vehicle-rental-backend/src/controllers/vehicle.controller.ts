@@ -1,13 +1,15 @@
 import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
 import { Role } from '@prisma/client';
-import { db } from '../config/db'; // Import the shared instance
+
+const prisma = new PrismaClient();
 
 // Extend Request type to include the user object from your auth middleware
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
-    role: Role;
+    role: Role; // Change from 'string' to 'Role'
   };
 }
 
@@ -19,8 +21,7 @@ export const addVehicle = async (req: AuthenticatedRequest, res: Response) => {
       fuelType, transmission, rentalRate, imageUrl 
     } = req.body;
 
-    // Use 'db' instead of 'prisma'
-    const newVehicle = await db.vehicle.create({
+    const newVehicle = await prisma.vehicle.create({
       data: {
         make,
         model,
@@ -45,10 +46,9 @@ export const addVehicle = async (req: AuthenticatedRequest, res: Response) => {
 export const updateVehicle = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   try {
-    // Use 'db' instead of 'prisma'
-    const updated = await db.vehicle.update({
+    const updated = await prisma.vehicle.update({
       where: { id },
-      data: req.body,
+      data: req.body, // Make sure to validate this in a real app!
     });
     res.status(200).json(updated);
   } catch (error: any) {
@@ -61,8 +61,8 @@ export const updateVehicle = async (req: AuthenticatedRequest, res: Response) =>
 export const removeVehicle = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   try {
-    // Use 'db' instead of 'prisma'
-    await db.vehicle.update({
+    // We don't delete from DB, we just set the deletedAt timestamp
+    await prisma.vehicle.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
@@ -75,11 +75,10 @@ export const removeVehicle = async (req: AuthenticatedRequest, res: Response) =>
 
 // 4. GET VEHICLES (Conditional Visibility)
 export const getVehicles = async (req: AuthenticatedRequest, res: Response) => {
-  const isAdmin = req.user?.role === Role.ADMIN;
+  const isAdmin = req.user?.role === 'ADMIN';
   
   try {
-    // Use 'db' instead of 'prisma'
-    const vehicles = await db.vehicle.findMany({
+    const vehicles = await prisma.vehicle.findMany({
       where: isAdmin 
         ? {} 
         : { deletedAt: null } 

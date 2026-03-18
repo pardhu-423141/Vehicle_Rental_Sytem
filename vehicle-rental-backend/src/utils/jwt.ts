@@ -7,5 +7,5 @@ export const signToken = (payload: { id: string, role: string }) => {
 };
 
 export const verifyToken = (token: string) => {
-  return jwt.verify(token, JWT_SECRET);
+  return jwt.verify(token, JWT_SECRET) as { id: string; role: string };
 };

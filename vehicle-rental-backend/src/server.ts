@@ -5,7 +5,7 @@ import 'dotenv/config';
 
 // 1. Import Routes
 import authRoutes from './routes/auth.routes';
-import vehicleRoutes from './routes/vehicleRoutes';
+import vehicleRoutes from './routes/vehicle.routes';
 import bookingRoutes from './routes/booking.routes';
 import reviewRoutes from './routes/review.routes';
 import kycRoutes from './routes/kyc.routes';
