@@ -21,20 +21,27 @@ enum KYCStatus {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  email       String    @unique
-  name        String
-  password    String
-  role        Role      @default(USER)
-  kycStatus   KYCStatus @default(PENDING)
-  isVerified  Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  bookings    Booking[]
-  reviews     Review[]
-  kycData     KYCData?
-}
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String
+  password     String
+  role         Role      @default(USER)
+  
+  // Verification Fields
+  isVerified   Boolean   @default(false)
+  otp          String?   // Stores the 6-digit code
+  otpExpires   DateTime? 
 
+  // KYC & Profile
+  kycStatus    KYCStatus @default(PENDING)
+  kycData      KYCData?
+  
+  // Relations & Timestamps
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  bookings     Booking[]
+  reviews      Review[]
+}
 model Vehicle {
   id            String    @id @default(uuid())
   make          String    // e.g., Toyota
