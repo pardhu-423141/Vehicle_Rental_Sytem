@@ -6,10 +6,7 @@ import {
   updateProfile, 
   handleKYC 
 } from '../controllers/user.controller';
-import { 
-  getBookingHistory, 
-  createBooking 
-} from '../controllers/booking.controller';
+
 import { 
   addReview, 
   getMyReviews 
@@ -57,10 +54,10 @@ router.post('/kyc', authenticate, authorize(['USER']),upload.fields([
 // router.get('/vehicles', getVehicles);
 
 // 5. Book a vehicle (Requires logged-in USER role)
-router.post('/bookings', authenticate, authorize(['USER']), createBooking);
+// router.post('/bookings', authenticate, authorize(['USER']), createBooking);
 
-// 6. See booking history
-router.get('/bookings/history', authenticate, authorize(['USER']), getBookingHistory);
+// // 6. See booking history
+// router.get('/bookings/history', authenticate, authorize(['USER']), getBookingHistory);
 
 
 /**

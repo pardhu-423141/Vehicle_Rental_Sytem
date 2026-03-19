@@ -10,6 +10,7 @@ import bookingRoutes from './routes/booking.routes';
 import reviewRoutes from './routes/review.routes';
 import kycRoutes from './routes/kyc.routes';
 import adminRoutes from './routes/admin.routes'; // ✅ NEW
+import userRoutes from './routes/user.routes';   
 
 // 2. Import Database Connection and Cron Tasks
 import './config/db';   // Ensures DB connection is tested on startup
@@ -32,6 +33,7 @@ app.use('/api/bookings', bookingRoutes);  // Rental & Availability Logic
 app.use('/api/reviews', reviewRoutes);    // Feedback & Ratings
 app.use('/api/kyc', kycRoutes);           // Identity Verification
 app.use('/api/admin', adminRoutes);
+app.use('/api/users', userRoutes);
 
 // 5. Global Error Handler (Optional but Recommended)
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
