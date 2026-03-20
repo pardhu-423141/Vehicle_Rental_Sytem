@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { Role } from '@prisma/client';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { upload } from '../middleware/upload.middleware';
 import { 
@@ -7,10 +6,7 @@ import {
   updateProfile, 
   handleKYC 
 } from '../controllers/user.controller';
-import { 
-  getBookingHistory, 
-  createBooking 
-} from '../controllers/booking.controller';
+
 import { 
   addReview, 
   getMyReviews 
@@ -21,6 +17,18 @@ import {
 
 const router = Router();
 
+
+// Cast the multer middleware to any or RequestHandler to bypass the version mismatch
+router.post(
+  '/kyc', 
+  authenticate, 
+  authorize(['USER']), 
+  (upload.fields([
+    { name: 'idImageFront', maxCount: 1 },
+    { name: 'idImageBack', maxCount: 1 }
+  ]) as any), 
+  handleKYC
+);
 /**
  * IDENTITY & KYC
  * These routes allow the user to manage their own personal data.
@@ -32,7 +40,7 @@ router.get('/profile', authenticate, getProfile);
 router.patch('/profile', authenticate, updateProfile);
 
 // 3. Upload or Re-upload KYC (Uses upsert logic in controller)
-router.post('/kyc', authenticate, authorize([Role.USER]),upload.fields([
+router.post('/kyc', authenticate, authorize(['USER']),upload.fields([
     { name: 'idImageFront', maxCount: 1 }, 
     { name: 'idImageBack', maxCount: 1 }
   ]), handleKYC);
@@ -46,10 +54,10 @@ router.post('/kyc', authenticate, authorize([Role.USER]),upload.fields([
 // router.get('/vehicles', getVehicles);
 
 // 5. Book a vehicle (Requires logged-in USER role)
-router.post('/bookings', authenticate, authorize([Role.USER]), createBooking);
+// router.post('/bookings', authenticate, authorize(['USER']), createBooking);
 
-// 6. See booking history
-router.get('/bookings/history', authenticate, authorize([Role.USER]), getBookingHistory);
+// // 6. See booking history
+// router.get('/bookings/history', authenticate, authorize(['USER']), getBookingHistory);
 
 
 /**
@@ -57,9 +65,9 @@ router.get('/bookings/history', authenticate, authorize([Role.USER]), getBooking
  * User reviews and history of reviews.
  */
 // 7. Add a review for a completed rental
-router.post('/reviews', authenticate, authorize([Role.USER]), addReview);
+router.post('/reviews', authenticate, authorize(['USER']), addReview);
 
 // 8. See all my reviews in one place
-router.get('/reviews/all', authenticate, authorize([Role.USER]), getMyReviews);
+router.get('/reviews/all', authenticate, authorize(['USER']), getMyReviews);
 
 export default router;

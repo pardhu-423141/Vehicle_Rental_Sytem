@@ -1,76 +1,164 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios'; // Ensure you have axios installed
 
 export default function Register() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+  const [step, setStep] = useState<'register' | 'otp'>('register');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: FormEvent) => {
+  // Form States
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+  });
+  const [otp, setOtp] = useState('');
+
+  // 1. Handle Initial Registration
+  const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
-    console.log("Register:", { name, email, password });
+    setLoading(true);
+    setError('');
+
+    try {
+      // Replace with your actual backend URL
+      await axios.post('http://localhost:5000/api/auth/register', formData);
+      setStep('otp'); // Switch to OTP input on success
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Handle OTP Verification
+  const handleVerifyOtp = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      await axios.post('http://localhost:5000/api/auth/verify-otp', {
+        email: formData.email,
+        otp,
+      });
+      // Redirect to login after successful verification
+      navigate('/login');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center bg-cover bg-center"
-      style={{ backgroundImage: "url('https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=2000&auto=format&fit=crop')" }}
-    >
-      <div className="absolute inset-0 bg-black/40"></div>
-
-      <div className="relative z-10 w-full max-w-md p-8 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-xl">
-        <h2 className="text-3xl font-bold text-center text-white mb-2">Create Account</h2>
-        <p className="text-center text-gray-200 mb-8">Join us and start driving today</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
         
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-gray-200 text-sm font-medium mb-2">Full Name</label>
-            <input 
-              type="text" 
-              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
-              placeholder="John Doe"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {step === 'register' ? 'Create an account' : 'Verify your email'}
+          </h2>
+          <p className="text-gray-500 mt-2">
+            {step === 'register' 
+              ? 'Join our vehicle rental community' 
+              : `Enter the 6-digit code sent to ${formData.email}`}
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
+            {error}
           </div>
+        )}
 
-          <div>
-            <label className="block text-gray-200 text-sm font-medium mb-2">Email Address</label>
-            <input 
-              type="email" 
-              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
+        {step === 'register' ? (
+          /* REGISTRATION FORM */
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+              <input 
+                type="text" 
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                placeholder="John Doe"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-gray-200 text-sm font-medium mb-2">Password</label>
-            <input 
-              type="password" 
-              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <input 
+                type="email" 
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                placeholder="you@example.com"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                required
+              />
+            </div>
 
-          <button 
-            type="submit" 
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg transition duration-300 transform hover:scale-[1.02]"
-          >
-            Sign Up
-          </button>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input 
+                type="password" 
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                required
+              />
+            </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-gray-200">
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:bg-blue-400"
+            >
+              {loading ? 'Sending OTP...' : 'Get Started'}
+            </button>
+          </form>
+        ) : (
+          /* OTP VERIFICATION FORM */
+          <form onSubmit={handleVerifyOtp} className="space-y-6">
+            <div>
+              <input 
+                type="text" 
+                maxLength={6}
+                className="w-full text-center text-3xl tracking-[1rem] font-bold px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                placeholder="000000"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                required
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:bg-green-400"
+            >
+              {loading ? 'Verifying...' : 'Verify & Finish'}
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => setStep('register')}
+              className="w-full text-sm text-gray-500 hover:text-gray-700"
+            >
+              Change Email / Back
+            </button>
+          </form>
+        )}
+
+        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+          <p className="text-gray-600 text-sm">
             Already have an account?{' '}
-            <Link to="/login" className="text-blue-300 hover:text-white font-semibold underline decoration-transparent hover:decoration-white transition">
+            <Link to="/login" className="text-blue-600 hover:underline font-medium">
               Log in
             </Link>
           </p>

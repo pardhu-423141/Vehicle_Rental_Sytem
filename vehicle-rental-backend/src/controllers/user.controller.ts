@@ -25,9 +25,11 @@ export const handleKYC = async (req: any, res: Response) => {
       return new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { folder: "kyc_documents" },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result?.secure_url || "");
+          (error: any, result: any) => { 
+            if (error) {
+              return res.status(500).json({ message: "Upload failed" });
+            }
+            else {resolve(result?.secure_url || "")};
           },
         );
         uploadStream.end(fileBuffer);
