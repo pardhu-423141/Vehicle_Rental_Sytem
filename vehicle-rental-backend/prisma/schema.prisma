@@ -15,6 +15,7 @@ enum Role {
 }
 
 enum KYCStatus {
+  NOT_SUBMITTED
   PENDING
   APPROVED
   REJECTED
@@ -33,7 +34,7 @@ model User {
   otpExpires   DateTime? 
 
   // KYC & Profile
-  kycStatus    KYCStatus @default(PENDING)
+  kycStatus    KYCStatus @default(NOT_SUBMITTED)
   kycData      KYCData?
   
   // Relations & Timestamps

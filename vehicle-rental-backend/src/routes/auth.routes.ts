@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registerUser,loginUser,verifyOTP } from '../controllers/auth.controller';
+import { registerUser,loginUser,verifyOTP , logoutUser} from '../controllers/auth.controller';
 
 const router = Router();
 
@@ -9,4 +9,5 @@ router.post('/register', registerUser);
 // Endpoint: POST /api/auth/login
 router.post('/login', loginUser);
 router.post('/verify-otp', verifyOTP);
+router.post('/logout', logoutUser);
 export default router;

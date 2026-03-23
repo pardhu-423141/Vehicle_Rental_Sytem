@@ -131,7 +131,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
     res.cookie('auth_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false , //process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000,
     });
@@ -143,4 +143,13 @@ export const loginUser = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({ message: "Login error" });
   }
+};
+
+export const logoutUser = async (req: Request, res: Response) => {
+  res.clearCookie('auth_token', {
+    httpOnly: true,
+    secure: false, //process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
+  return res.json({ message: "Logged out successfully" });
 };

@@ -1,168 +1,165 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios'; // Ensure you have axios installed
+import { User, Mail, Lock, ShieldCheck, ArrowRight, ChevronLeft } from 'lucide-react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 
 export default function Register() {
   const navigate = useNavigate();
   const [step, setStep] = useState<'register' | 'otp'>('register');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  // Form States
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [otp, setOtp] = useState('');
 
-  // 1. Handle Initial Registration
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-
     try {
-      // Replace with your actual backend URL
       await axios.post('http://localhost:5000/api/auth/register', formData);
-      setStep('otp'); // Switch to OTP input on success
+      toast.success('OTP sent to your email');
+      setStep('otp');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      toast.error(err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Handle OTP Verification
   const handleVerifyOtp = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-
     try {
-      await axios.post('http://localhost:5000/api/auth/verify-otp', {
-        email: formData.email,
-        otp,
-      });
-      // Redirect to login after successful verification
+      await axios.post('http://localhost:5000/api/auth/verify-otp', { email: formData.email, otp });
+      toast.success('Account verified! Please login.');
       navigate('/login');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid OTP');
+      toast.error(err.response?.data?.message || 'Invalid OTP');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+    <div className=" w-full min-h-screen flex items-center justify-center p-4 font-sans relative overflow-hidden">
+      {/* Background Decorative Blobs */}
+      <div className="absolute top-0 -left-4 w-72 h-72 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+      <div className="absolute bottom-0 -right-4 w-72 h-72 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+
+      <div className="w-full max-w-md bg-white/10 backdrop-blur-2xl border border-white/20 p-8 rounded-[2.5rem] shadow-2xl z-10 animate-in fade-in zoom-in duration-500">
         
         {/* Header */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {step === 'register' ? 'Create an account' : 'Verify your email'}
+        <div className="text-center mb-10">
+          <div className="inline-flex p-3 rounded-2xl bg-blue-500/20 border border-blue-500/30 text-blue-400 mb-4">
+            {step === 'register' ? <User size={28} /> : <ShieldCheck size={28} />}
+          </div>
+          <h2 className="text-3xl font-bold text-white tracking-tight">
+            {step === 'register' ? 'Join the Fleet' : 'Secure Verification'}
           </h2>
-          <p className="text-gray-500 mt-2">
+          <p className="text-gray-400 mt-2 text-sm">
             {step === 'register' 
-              ? 'Join our vehicle rental community' 
-              : `Enter the 6-digit code sent to ${formData.email}`}
+              ? 'Create your account to start your journey' 
+              : `Check your inbox at ${formData.email}`}
           </p>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
-            {error}
-          </div>
-        )}
-
         {step === 'register' ? (
-          /* REGISTRATION FORM */
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-              <input 
-                type="text" 
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="John Doe"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-              <input 
-                type="email" 
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input 
-                type="password" 
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                required
-              />
-            </div>
+          <form onSubmit={handleRegister} className="space-y-5">
+            <GlassInput 
+              icon={<User size={18} />} 
+              label="Full Name" 
+              type="text" 
+              placeholder="Saketh Kumar" 
+              value={formData.name}
+              onChange={(v:any) => setFormData({...formData, name: v})}
+            />
+            <GlassInput 
+              icon={<Mail size={18} />} 
+              label="Email Address" 
+              type="email" 
+              placeholder="saketh@nitap.ac.in" 
+              value={formData.email}
+              onChange={(v:any) => setFormData({...formData, email: v})}
+            />
+            <GlassInput 
+              icon={<Lock size={18} />} 
+              label="Password" 
+              type="password" 
+              placeholder="••••••••" 
+              value={formData.password}
+              onChange={(v:any) => setFormData({...formData, password: v})}
+            />
 
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:bg-blue-400"
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 group disabled:opacity-50"
             >
-              {loading ? 'Sending OTP...' : 'Get Started'}
+              {loading ? 'Processing...' : 'Create Account'}
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </form>
         ) : (
-          /* OTP VERIFICATION FORM */
-          <form onSubmit={handleVerifyOtp} className="space-y-6">
-            <div>
+          <form onSubmit={handleVerifyOtp} className="space-y-8">
+            <div className="flex justify-center">
               <input 
                 type="text" 
                 maxLength={6}
-                className="w-full text-center text-3xl tracking-[1rem] font-bold px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                className="w-full bg-white/5 border border-white/10 text-center text-4xl tracking-[0.75rem] font-black py-5 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
                 placeholder="000000"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 required
               />
             </div>
-
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:bg-green-400"
-            >
-              {loading ? 'Verifying...' : 'Verify & Finish'}
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => setStep('register')}
-              className="w-full text-sm text-gray-500 hover:text-gray-700"
-            >
-              Change Email / Back
-            </button>
+            <div className="space-y-3">
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-green-600/20"
+              >
+                {loading ? 'Verifying...' : 'Complete Verification'}
+              </button>
+              <button 
+                type="button"
+                onClick={() => setStep('register')}
+                className="w-full py-2 text-xs text-gray-500 hover:text-white transition flex items-center justify-center gap-1"
+              >
+                <ChevronLeft size={14} /> Edit Email or Go Back
+              </button>
+            </div>
           </form>
         )}
 
-        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-          <p className="text-gray-600 text-sm">
-            Already have an account?{' '}
-            <Link to="/login" className="text-blue-600 hover:underline font-medium">
-              Log in
+        <div className="mt-10 pt-6 border-t border-white/10 text-center">
+          <p className="text-gray-400 text-sm font-medium">
+            Already a member?{' '}
+            <Link to="/login" className="text-blue-400 hover:text-blue-300 transition-colors">
+              Access Dashboard
             </Link>
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper component for the Glassmorphism Inputs
+function GlassInput({ icon, label, type, placeholder, value, onChange }: any) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest ml-1">{label}</label>
+      <div className="relative group">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors">
+          {icon}
+        </div>
+        <input 
+          type={type} 
+          className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all text-sm"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required
+        />
       </div>
     </div>
   );

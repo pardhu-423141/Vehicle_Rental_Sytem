@@ -33,7 +33,7 @@ app.use('/api/bookings', bookingRoutes);  // Rental & Availability Logic
 app.use('/api/reviews', reviewRoutes);    // Feedback & Ratings
 app.use('/api/kyc', kycRoutes);           // Identity Verification
 app.use('/api/admin', adminRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/user', userRoutes);
 
 // 5. Global Error Handler (Optional but Recommended)
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

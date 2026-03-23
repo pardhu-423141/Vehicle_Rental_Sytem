@@ -49,7 +49,7 @@ export default function Layout() {
       )}
 
       {/* Main Content Area */}
-      <main className="relative z-10 flex-1 h-full overflow-y-auto overflow-x-hidden custom-scrollbar">
+      <main className="relative z-10 flex-1 h-full overflow-y-auto overflow-x-hidden custom-scrollbar ">
         <div className="w-full min-h-full flex flex-col items-center pt-24 pb-12 transition-all duration-500">
           <Outlet /> 
         </div>

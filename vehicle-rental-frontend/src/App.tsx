@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import type { JSX } from 'react';
-
+import { AuthProvider } from './context/AuthContext';
 // Import Components & Pages
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -24,10 +24,11 @@ import ManagerOperations from './pages/manager/Operations';
 import ServiceInbox from './pages/manager/Maintenance';
 import KycQueue from './pages/userManager/KycQueue';
 import UserDirectory from './pages/userManager/UserDirectory';
-
+import { PublicRoute } from './components/PublicRoute';
 
 export default function App(): JSX.Element {
   return (
+    <AuthProvider>
     <Router>
       <Toaster position="top-center" toastOptions={{ 
         style: { background: '#333', color: '#fff' } 
@@ -37,8 +38,9 @@ export default function App(): JSX.Element {
         {/* Everything inside this Layout route will have the glassmorphism background and Navbar */}
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           
           {/* Typing localhost:5173/AdminDashboard will now render this component */}
           <Route path="/AdminDashboard" element={<AdminDashboard />} />
@@ -61,5 +63,6 @@ export default function App(): JSX.Element {
         </Route>
       </Routes>
     </Router>
+    </AuthProvider>
   );
 }
