@@ -12,6 +12,7 @@ import {
   MessageSquareWarning
 } from 'lucide-react';
 
+import { useAuth } from '../context/AuthContext'; 
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
@@ -19,7 +20,7 @@ interface SidebarProps {
 
 export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
-
+  const { logout } = useAuth();
   // Organized based on your Workflow Roles
   const menuGroups = [
     {
@@ -101,10 +102,13 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
           </div>
 
           {/* Exit / Logout */}
-          <Link to="/login" className="flex items-center gap-3 px-5 py-4 mt-8 text-red-400 hover:bg-red-500/10 rounded-2xl transition-all border border-transparent hover:border-red-500/20 group">
+          <button 
+            onClick={logout}
+            className="flex items-center gap-3 px-5 py-4 mt-8 text-red-400 hover:bg-red-500/10 rounded-2xl transition-all border border-transparent hover:border-red-500/20 group"
+          >
             <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
             <span className="font-bold uppercase tracking-widest text-xs">Sign Out</span>
-          </Link>
+          </button>
         </div>
       </aside>
     </>
