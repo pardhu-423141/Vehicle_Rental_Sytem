@@ -6,40 +6,83 @@ import { db } from '../config/db'; // Using your Prisma 7 adapter
  */
 
 // 1. SUBMIT KYC DATA
+
+import { v2 as cloudinary } from 'cloudinary';
+import streamifier from 'streamifier';
+
+// Helper to upload buffer to Cloudinary
+// Cloudinary Stream Helper
+const streamUpload = (file: Express.Multer.File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "kyc_documents" },
+      (error, result) => {
+        if (result) resolve(result.secure_url);
+        else reject(error);
+      }
+    );
+    streamifier.createReadStream(file.buffer).pipe(stream);
+  });
+};
+
 export const submitKYC = async (req: any, res: Response) => {
-  const { idType, idNumber, idImageFront } = req.body;
-  const userId = req.user?.id; // Set by your authenticate middleware
+  const { idType, idNumber } = req.body;
+  const userId = req.user?.id;
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
   try {
-    // Check if user already has a KYC record
-    const existingKYC = await db.kYCData.findUnique({
-      where: { userId }
-    });
-
-    if (existingKYC) {
-      return res.status(400).json({ message: "KYC already submitted for this account." });
+    // 1. Validation: Front image is mandatory in your schema
+    if (!files?.idImageFront?.[0]) {
+      return res.status(400).json({ message: "Front ID image is required." });
     }
 
-    // Create the KYC data record
-    await db.kYCData.create({
-      data: {
-        userId,
-        idType,
+    // 2. Check if ID Number is already taken by ANOTHER user (Since it's @unique)
+    const duplicateId = await db.kYCData.findFirst({
+      where: { 
         idNumber,
-        idImageFront
+        NOT: { userId } // Check if someone else owns this ID number
       }
     });
 
-    // Update the User's overall kycStatus to PENDING
+    if (duplicateId) {
+      return res.status(400).json({ message: "This ID number is already registered to another account." });
+    }
+
+    // 3. Upload to Cloudinary
+    const [frontUrl, backUrl] = await Promise.all([
+      streamUpload(files.idImageFront[0]),
+      files.idImageBack ? streamUpload(files.idImageBack[0]) : Promise.resolve(null)
+    ]);
+
+    // 4. Update or Create (Upsert) based on your Model
+    await db.kYCData.upsert({
+      where: { userId },
+      update: {
+        idType,
+        idNumber,
+        idImageFront: frontUrl,
+        idImageBack: backUrl,
+      },
+      create: {
+        userId,
+        idType,
+        idNumber,
+        idImageFront: frontUrl,
+        idImageBack: backUrl,
+      }
+    });
+
+    // 5. Update User Status
     await db.user.update({
       where: { id: userId },
       data: { kycStatus: 'PENDING' }
     });
 
     res.status(201).json({ message: "KYC documents submitted successfully." });
-  } catch (error) {
-    console.error("KYC Submission Error:", error);
-    res.status(500).json({ message: "Failed to submit KYC data." });
+
+  } catch (error: any) {
+    console.error("KYC Error:", error);
+    res.status(500).json({ message: "Submission failed. Please try again." });
   }
 };
 

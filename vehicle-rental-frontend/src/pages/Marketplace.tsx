@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { IndianRupee, UserCircle, Car, Bike, CarFront, LayoutGrid } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 
 // Mock Data reflecting Step 3 requirements
 const MOCK_VEHICLES = [
