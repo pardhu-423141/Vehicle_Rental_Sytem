@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom'; // 1. Added useNavigate
 import { 
   LayoutDashboard, 
   Car, 
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext'; 
+
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
@@ -20,29 +21,41 @@ interface SidebarProps {
 
 export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate(); // 2. Initialize navigate
   const { logout } = useAuth();
-  // Organized based on your Workflow Roles
+
+  // 3. Create a dedicated Logout Handler
+  const handleLogout = async () => {
+    try {
+      setIsOpen(false); // Close the sidebar first for smooth UI
+      await logout();   // Execute the logout logic from Context
+      navigate('/login', { replace: true }); // 4. Force redirect to login
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   const menuGroups = [
     {
       label: 'Core',
       items: [
-        { name: 'Dashboard', path: '/AdminDashboard', icon: LayoutDashboard }, // Overview
+        { name: 'Dashboard', path: '/AdminDashboard', icon: LayoutDashboard },
       ]
     },
     {
       label: 'Inventory & Operations',
       items: [
-        { name: 'Fleet Management', path: '/admin/fleet', icon: Car }, // Step 3
-        { name: 'Maintenance Hub', path: '/admin/maintenance', icon: Wrench }, // Step 9
-        { name: 'Issue Logs', path: '/admin/issues', icon: MessageSquareWarning }, // Step 7
+        { name: 'Fleet Management', path: '/admin/fleet', icon: Car },
+        { name: 'Maintenance Hub', path: '/admin/maintenance', icon: Wrench },
+        { name: 'Issue Logs', path: '/admin/issues', icon: MessageSquareWarning },
       ]
     },
     {
       label: 'User & Staff Control',
       items: [
-        { name: 'KYC Verifications', path: '/admin/kyc', icon: ShieldCheck }, // Step 2
-        { name: 'Customer Directory', path: '/admin/users', icon: Users }, // Step 2.1
-        { name: 'Staff Management', path: '/admin/staff', icon: UserCog }, // Step 2.3
+        { name: 'KYC Verifications', path: '/admin/kyc', icon: ShieldCheck },
+        { name: 'Customer Directory', path: '/admin/users', icon: Users },
+        { name: 'Staff Management', path: '/admin/staff', icon: UserCog },
       ]
     }
   ];
@@ -103,8 +116,8 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
 
           {/* Exit / Logout */}
           <button 
-            onClick={logout}
-            className="flex items-center gap-3 px-5 py-4 mt-8 text-red-400 hover:bg-red-500/10 rounded-2xl transition-all border border-transparent hover:border-red-500/20 group"
+            onClick={handleLogout} // Updated to use the handler
+            className="flex items-center gap-3 px-5 py-4 mt-8 text-red-400 hover:bg-red-500/10 rounded-2xl transition-all border border-transparent hover:border-red-500/20 group w-full text-left"
           >
             <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
             <span className="font-bold uppercase tracking-widest text-xs">Sign Out</span>
