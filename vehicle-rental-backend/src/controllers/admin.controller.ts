@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
+import { PrismaClient } from '@prisma/client';
 
 // 1. GET ALL USERS (with Pagination)
 export const getAllUsers = async (req: Request, res: Response) => {
@@ -237,5 +238,37 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
     res.status(200).json(transactions);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch transactions." });
+  }
+};
+
+const prisma = new PrismaClient();
+
+export const getMaintenanceTasks = async (req: Request, res: Response) => {
+  try {
+    // We fetch vehicles where status is 'maintenance'
+    const vehicles = await prisma.vehicle.findMany({
+      where: {
+        status: "under maintenance",
+        deletedAt: null // Ensure we don't fetch deleted ones
+      }
+    });
+    res.json(vehicles);
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const resolveMaintenance = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params; // This is the vehicle ID from the URL
+    
+    await prisma.vehicle.update({
+      where: { id: id },
+      data: { status: "Available" }
+    });
+
+    res.json({ message: "Vehicle restored to Available status" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to resolve maintenance" });
   }
 };

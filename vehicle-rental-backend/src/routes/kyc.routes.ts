@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { submitKYC, getMyKYCStatus, updateKYCStatus } from '../controllers/kyc.controller';
+import { submitKYC, getMyKYCStatus, updateKYCStatus,getAllKYCSubmissions } from '../controllers/kyc.controller';
 import { authenticate, isAdmin } from '../middleware/auth.middleware';
 import { upload } from '../middleware/upload.middleware';
 
@@ -30,5 +30,8 @@ router.get('/status', authenticate, getMyKYCStatus);
  * @access  Private (Admin)
  */
 router.patch('/review/:userId', authenticate, isAdmin, updateKYCStatus);
-
+// This makes the full URL: PATCH /api/admin/kyc/review/:userId
+router.patch('/review/:userId', authenticate, isAdmin, updateKYCStatus);
+// TEMPORARY: Remove 'authenticate' and 'isAdmin' to test connectivity
+router.get('/submissions', getAllKYCSubmissions);
 export default router;

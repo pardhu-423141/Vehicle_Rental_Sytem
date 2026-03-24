@@ -131,3 +131,18 @@ export const updateKYCStatus = async (req: any, res: Response) => {
     res.status(500).json({ message: "Failed to update KYC status." });
   }
 };
+
+export const getAllKYCSubmissions = async (req: any, res: Response) => {
+  try {
+    const submissions = await db.user.findMany({
+      where: {
+        // Fetch everyone who has at least attempted KYC
+        kycStatus: { in: ['PENDING', 'APPROVED', 'REJECTED'] }
+      },
+      include: { kycData: true } // Important: Include the relation!
+    });
+    res.status(200).json(submissions);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching KYC data" });
+  }
+};

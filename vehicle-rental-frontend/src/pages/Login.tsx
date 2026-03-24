@@ -18,12 +18,27 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', formData,{withCredentials: true});
+      const res = await axios.post('http://localhost:5000/api/auth/login', formData, {
+        withCredentials: true // Important for cookies
+      });
+
+      // --- THE FIX STARTS HERE ---
+      // 1. Extract the token from the response
+      const { token, user } = res.data;
+
+      // 2. Save the token to localStorage for our Axios interceptors
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+      // --- THE FIX ENDS HERE ---
+
       toast.success('Access Granted. Welcome back!');
-      console.log('Login Response:', res.data); // Debugging line
-      login(res.data.user);
-      // Navigate based on user role if needed
-      if (res.data.user.role === 'ADMIN') {
+      
+      // Update your Auth Context
+      login(user);
+
+      // Navigate based on user role
+      if (user.role === 'ADMIN') {
         navigate('/admin');
       } else {
         navigate('/Userdashboard');

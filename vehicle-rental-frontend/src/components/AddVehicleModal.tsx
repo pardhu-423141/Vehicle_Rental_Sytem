@@ -1,141 +1,229 @@
-import React, { useState } from 'react';
-import { X, Camera, Car, Fuel, Users, UserCircle, IndianRupee, ChevronDown, Gauge } from 'lucide-react';
+// AddVehicleModal.tsx
+import React, { useState, useEffect } from 'react';
+import { X, IndianRupee, Loader2, CarFront } from 'lucide-react';
+import toast from 'react-hot-toast';
+import type { Vehicle } from './VehicleCard';
+import axios from 'axios';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess: () => void;
+  initialData?: Vehicle | null;
 }
 
-export default function AddVehicleModal({ isOpen, onClose }: Props) {
+export default function AddVehicleModal({ isOpen, onClose, onSuccess, initialData }: Props) {
+  const [loading, setLoading] = useState(false);
+  const isEditMode = !!initialData;
+
+  const [formData, setFormData] = useState({
+    make: '',
+    model: '',
+    year: new Date().getFullYear().toString(),
+    licensePlate: '',
+    color: 'White',
+    fuelType: 'PETROL',
+    transmission: 'MANUAL',
+    rentalRate: '',
+    imageUrl: '',
+    status: 'Available',
+    type: 'FIVE_SEATER' // Added default enum value
+  });
+
+  useEffect(() => {
+    if (initialData && isOpen) {
+      setFormData({
+        make: initialData.make || '',
+        model: initialData.model || '',
+        year: initialData.year?.toString() || new Date().getFullYear().toString(),
+        licensePlate: initialData.plate || '',
+        color: 'White', 
+        fuelType: initialData.fuelType || 'PETROL',
+        transmission: initialData.transmission || 'MANUAL',
+        rentalRate: initialData.price?.toString() || '',
+        imageUrl: initialData.image || '',
+        status: initialData.status || 'Available',
+        type: initialData.type || 'FIVE_SEATER'
+      });
+    } else if (!initialData && isOpen) {
+      setFormData({
+        make: '', model: '', year: new Date().getFullYear().toString(),
+        licensePlate: '', color: 'White', fuelType: 'PETROL',
+        transmission: 'MANUAL', rentalRate: '', imageUrl: '', status: 'Available',
+        type: 'FIVE_SEATER'
+      });
+    }
+  }, [initialData, isOpen]);
+
   if (!isOpen) return null;
+
+  // AddVehicleModal.tsx
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+
+  // 1. Manually get the token from localStorage
+  const token = localStorage.getItem('token'); 
+
+  // 2. Format your payload
+  const payload = {
+    ...formData,
+    year: Number(formData.year),
+    rentalRate: parseFloat(formData.rentalRate),
+    // Ensure 'type' matches your Enum (e.g., "FIVE_SEATER")
+  };
+
+  try {
+    // 3. Pass the token in the config object (3rd argument of axios.post)
+    const response = await axios.post(
+      'http://localhost:5000/api/admin/vehicles', 
+      payload, 
+      {
+        headers: {
+          Authorization: `Bearer ${token}` // 🛡️ This is what the backend is looking for
+        },
+        withCredentials: true // Only keep this if your backend uses both cookies & tokens
+      }
+    );
+
+    toast.success("Vehicle Added Successfully!");
+    onSuccess();
+    onClose();
+  } catch (err: any) {
+    console.error("Submit Error:", err.response?.data);
+    const errorMsg = err.response?.data?.message || "Operation failed";
+    toast.error(errorMsg);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop for Glass Effect */}
-      <div 
-        className="absolute inset-0 bg-black/70 backdrop-blur-md transition-opacity"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
-      {/* Modal Card */}
-      <div className="relative w-full max-w-3xl bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-        
-        {/* Header - Workflow Step 3 */}
+      <div className="relative w-full max-w-3xl bg-slate-900 border border-white/20 rounded-3xl shadow-2xl overflow-hidden">
         <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
           <div>
-            <h2 className="text-2xl font-bold text-white">Register New Vehicle</h2>
-            <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest font-semibold">Step 3: Fleet Addition</p>
+            <h2 className="text-2xl font-bold text-white">
+              {isEditMode ? `Update ${formData.make}` : 'Register New Vehicle'}
+            </h2>
+            <p className="text-xs text-blue-400 mt-1 uppercase tracking-widest font-semibold">
+              Asset Configuration
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400">
             <X size={24} />
           </button>
         </div>
 
-        {/* Form Content */}
-        <form className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+        <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
             
-            {/* 1. Vehicle Details */}
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-blue-400 uppercase tracking-tighter">Basic Information</h4>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-tight">Basic Information</h4>
               
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300 ml-1">Vehicle Model Name</label>
-                <div className="relative">
-                  <Car className="absolute left-3 top-3 text-gray-500" size={18} />
-                  <input type="text" placeholder="e.g. Royal Enfield Himalayan" className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300 ml-1">License Plate Number</label>
-                <input type="text" placeholder="AP-39-XX-0000" className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition uppercase" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300 ml-1">Category</label>
-                  <select className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition appearance-none cursor-pointer">
-                    <option className="bg-slate-900">Bike</option>
-                    <option className="bg-slate-900">Auto</option>
-                    <option className="bg-slate-900">Sedan</option>
-                    <option className="bg-slate-900">SUV</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300 ml-1">Seating</label>
-                  <div className="relative">
-                    <Users className="absolute left-3 top-3 text-gray-500" size={18} />
-                    <input type="number" placeholder="2" className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Management & Pricing - Workflow Roles */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-tighter">Administrative Control</h4>
-              
-              {/* Manager Assignment Dropdown */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300 ml-1">Assign Vehicle Manager</label>
-                <div className="relative">
-                  <UserCircle className="absolute left-3 top-3 text-blue-400" size={18} />
-                  <select className="w-full pl-10 pr-10 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition appearance-none cursor-pointer">
-                    <option className="bg-slate-900">Select Manager</option>
-                    <option className="bg-slate-900">Suresh V. (Vehicle Manager)</option>
-                    <option className="bg-slate-900">Mahesh K. (Vehicle Manager)</option>
-                    <option className="bg-slate-900">Rahul S. (Maintenance Specialist)</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-3 text-gray-500" size={18} />
-                </div>
-                <p className="text-[10px] text-gray-500 italic ml-1">*This manager will handle Step 5: Handover</p>
-              </div>
-
-              {/* Status Selection - Lifecycle Step 4 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300 ml-1">Initial Status</label>
-                <select className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition appearance-none cursor-pointer font-bold">
-                  <option className="bg-slate-900 text-green-400">Available</option>
-                  <option className="bg-slate-900 text-yellow-400">Booked</option>
-                  <option className="bg-slate-900 text-blue-400">In Use</option>
-                  <option className="bg-slate-900 text-red-400">Under Maintenance</option>
+              {/* Added Vehicle Type Dropdown */}
+              <div className="relative">
+                <CarFront className="absolute left-3 top-3.5 text-blue-400" size={18} />
+                <select 
+                  className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.type}
+                  onChange={(e) => setFormData({...formData, type: e.target.value})}
+                >
+                  <option value="TWO_WHEELER">2 Wheeler</option>
+                  <option value="FOUR_SEATER">4 Seater</option>
+                  <option value="FIVE_SEATER">5 Seater</option>
+                  <option value="SEVEN_SEATER">7 Seater</option>
+                  <option value="LUXURY">Luxury</option>
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300 ml-1">Hourly Rental Rate</label>
-                <div className="relative">
-                  <IndianRupee className="absolute left-3 top-3 text-green-400" size={18} />
-                  <input type="number" placeholder="40" className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition" />
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                <input 
+                  required placeholder="Make" 
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.make}
+                  onChange={(e) => setFormData({...formData, make: e.target.value})}
+                />
+                <input 
+                  required placeholder="Model" 
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.model}
+                  onChange={(e) => setFormData({...formData, model: e.target.value})}
+                />
+              </div>
+
+              <input 
+                required placeholder="License Plate" 
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                value={formData.licensePlate}
+                onChange={(e) => setFormData({...formData, licensePlate: e.target.value.toUpperCase()})}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-tight">Technical Details</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <select 
+                  className="w-full px-4 py-3 bg-slate-800 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.fuelType}
+                  onChange={(e) => setFormData({...formData, fuelType: e.target.value})}
+                >
+                  <option value="PETROL">Petrol</option>
+                  <option value="DIESEL">Diesel</option>
+                  <option value="ELECTRIC">Electric</option>
+                </select>
+                <select 
+                  className="w-full px-4 py-3 bg-slate-800 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.transmission}
+                  onChange={(e) => setFormData({...formData, transmission: e.target.value})}
+                >
+                  <option value="MANUAL">Manual</option>
+                  <option value="AUTOMATIC">Automatic</option>
+                </select>
+              </div>
+
+              <input 
+                required type="number" placeholder="Year" 
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.year}
+                onChange={(e) => setFormData({...formData, year: e.target.value})}
+              />
+              <div className="relative">
+                <IndianRupee className="absolute left-3 top-3.5 text-green-400" size={18} />
+                <input 
+                  required type="number" placeholder="Rental Rate / Day" 
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.rentalRate}
+                  onChange={(e) => setFormData({...formData, rentalRate: e.target.value})}
+                />
               </div>
             </div>
           </div>
 
-          {/* 3. Image Upload Section */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 ml-1">Vehicle Photograph</label>
-            <div className="w-full h-32 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center text-gray-400 hover:border-blue-500/50 hover:bg-white/5 transition cursor-pointer group">
-              <Camera className="mb-2 group-hover:text-blue-400 transition-colors" />
-              <span className="text-sm font-medium">Click to upload vehicle photo</span>
-            </div>
+            <label className="text-sm text-gray-400 ml-1">Vehicle Image URL</label>
+            <input 
+              type="text" 
+              placeholder="https://..."
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.imageUrl}
+              onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
+            />
           </div>
 
-          {/* Footer Actions */}
           <div className="flex gap-4 pt-6">
-            <button 
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-4 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white/10 transition-colors"
-            >
+            <button type="button" onClick={onClose} className="flex-1 py-4 bg-white/5 text-white font-bold rounded-xl border border-white/10 hover:bg-white/10 transition">
               Cancel
             </button>
             <button 
-              type="submit"
-              className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-900/30 transition transform hover:scale-[1.02] active:scale-95"
+              type="submit" 
+              disabled={loading}
+              className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2"
             >
-              Add to Fleet
+              {loading ? <Loader2 className="animate-spin" size={20} /> : (isEditMode ? 'Update Asset' : 'Add to Fleet')}
             </button>
           </div>
         </form>

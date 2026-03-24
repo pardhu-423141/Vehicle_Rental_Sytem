@@ -31,4 +31,5 @@ router.put(
 // Only ADMIN can remove (Soft Delete) as per your requirement
 router.delete('/remove/:id', authenticate, isAdmin, removeVehicle);
 
+
 export default router;

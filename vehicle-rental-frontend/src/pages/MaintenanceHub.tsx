@@ -1,54 +1,103 @@
-import { useState } from 'react';
-import { Wrench, CheckCircle, AlertTriangle, Clock, Hammer, Search } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Wrench, CheckCircle, AlertTriangle, Clock, Hammer, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 interface MaintenanceTask {
-  id: string;
-  vehicleId: string;
-  vehicleName: string;
+  id: string;          // Maps to Vehicle.id
+  vehicleId: string;   // Maps to Vehicle.licensePlate
+  vehicleName: string; // Maps to Vehicle.make + Vehicle.model
   issue: string;
   reportedDate: string;
   priority: 'High' | 'Medium' | 'Low';
-  status: 'In Progress' | 'Awaiting Parts' | 'Scheduled';
+  status: string;
 }
 
-const MOCK_TASKS: MaintenanceTask[] = [
-  { id: 'MT-001', vehicleId: 'V-003', vehicleName: 'Toyota Innova', issue: 'Brake Noise Reported', reportedDate: '2026-03-01', priority: 'High', status: 'In Progress' },
-  { id: 'MT-002', vehicleId: 'V-005', vehicleName: 'Honda Activa', issue: 'Oil Change & General Service', reportedDate: '2026-03-02', priority: 'Low', status: 'Scheduled' },
-  { id: 'MT-003', vehicleId: 'V-009', vehicleName: 'Suzuki Swift', issue: 'Clutch plate slipping', reportedDate: '2026-02-28', priority: 'Medium', status: 'Awaiting Parts' },
-];
-
 export default function MaintenanceHub() {
-  const [tasks, setTasks] = useState(MOCK_TASKS);
+  const [tasks, setTasks] = useState<MaintenanceTask[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleResolve = (id: string, name: string) => {
-    toast.success(`${name} is now Available! Status updated in Step 9`);
-    setTasks(tasks.filter(t => t.id !== id));
+  // 1. Fetch Maintenance Data (Vehicles with status 'maintenance')
+  const fetchMaintenanceTasks = async () => {
+    try {
+      setLoading(true);
+      // Ensure your backend returns vehicles filtered by status: 'maintenance'
+      const { data } = await axios.get('/admin/maintenance'); 
+      
+      if (Array.isArray(data)) {
+        const mappedTasks = data.map((v: any) => ({
+          id: v.id,
+          vehicleId: v.licensePlate, // Using license plate as the visible ID
+          vehicleName: `${v.make} ${v.model}`,
+          issue: "Scheduled Maintenance / Repair", // Default since schema has no 'issue' field
+          reportedDate: new Date(v.updatedAt).toLocaleDateString(),
+          priority: 'Medium' as const, // Defaulting to medium
+          status: v.status.toUpperCase() // e.g., "MAINTENANCE"
+        }));
+        setTasks(mappedTasks);
+      }
+    } catch (error: any) {
+      console.error("Fetch error:", error);
+      toast.error(error.response?.status === 404 
+        ? "Endpoint /api/admin/maintenance not found." 
+        : "Failed to load repair logs"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchMaintenanceTasks();
+  }, []);
+
+  // 2. Resolve Task: Updates vehicle status back to "available"
+  const handleResolve = async (vehicleId: string, vehicleName: string) => {
+  try {
+    // This URL must match your router.put('/maintenance/:id/resolve')
+    await axios.put(`/admin/maintenance/${vehicleId}/resolve`);
+    
+    toast.success(`${vehicleName} is now Available!`);
+    setTasks(prev => prev.filter(t => t.id !== vehicleId));
+  } catch (error) {
+    toast.error("Failed to update status");
+  }
+};
+
+  // 3. Simple stats based on current task list
+  const activeCount = tasks.length;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-white">
+        <Loader2 className="animate-spin mb-4 text-blue-500" size={40} />
+        <p className="text-gray-400 font-medium">Synchronizing Maintenance Logs...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-7xl px-4 animate-in fade-in duration-700">
-      
-      {/* Header - Step 9 */}
       <div className="mb-10">
         <h1 className="text-4xl font-bold text-white tracking-tight">Maintenance Hub</h1>
-        <p className="text-gray-400 mt-2">Step 9: Vehicle Manager repair and status recovery.</p>
+        <p className="text-gray-400 mt-2">Recovery center for vehicles currently out of service.</p>
       </div>
 
-      {/* Maintenance Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-4 shadow-xl shadow-red-900/10">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-4 shadow-lg shadow-red-900/10">
           <div className="p-3 bg-red-500/20 rounded-xl text-red-400"><AlertTriangle size={24}/></div>
           <div>
-            <p className="text-2xl font-bold text-white">{tasks.length}</p>
-            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Active Repairs</p>
+            <p className="text-2xl font-bold text-white">{activeCount}</p>
+            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">In the Shop</p>
           </div>
         </div>
+        
         <div className="p-6 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center gap-4">
           <div className="p-3 bg-blue-500/20 rounded-xl text-blue-400"><Clock size={24}/></div>
           <div>
-            <p className="text-2xl font-bold text-white">02</p>
-            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Awaiting Parts</p>
+            <p className="text-2xl font-bold text-white">{activeCount > 0 ? 'Active' : 'Idle'}</p>
+            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Workflow Status</p>
           </div>
         </div>
       </div>
@@ -62,42 +111,43 @@ export default function MaintenanceHub() {
                 <Hammer size={24} />
               </div>
               <div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <h3 className="text-lg font-bold text-white">{task.vehicleName}</h3>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10">{task.vehicleId}</span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    task.priority === 'High' ? 'text-red-400 bg-red-400/10' : 'text-yellow-400 bg-yellow-400/10'
-                  }`}>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-300 border border-blue-500/30 font-mono">
+                    {task.vehicleId}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase text-yellow-400 bg-yellow-400/10">
                     {task.priority} Priority
                   </span>
                 </div>
                 <p className="text-sm text-gray-300 mt-1">{task.issue}</p>
-                <p className="text-[10px] text-gray-500 mt-2">Reported on {task.reportedDate}</p>
+                <p className="text-[10px] text-gray-500 mt-2">Repair Started: {task.reportedDate}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 w-full md:w-auto">
               <div className="flex-1 md:flex-none">
-                 <p className="text-[10px] text-gray-500 uppercase font-bold mb-1 ml-1 tracking-tighter">Current Status</p>
+                 <p className="text-[10px] text-gray-500 uppercase font-bold mb-1 ml-1 tracking-tighter">Current Phase</p>
                  <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white font-medium flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                     {task.status}
                  </div>
               </div>
+              
               <button 
                 onClick={() => handleResolve(task.id, task.vehicleName)}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-900/20 active:scale-95"
+                className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-900/20 active:scale-95 whitespace-nowrap"
               >
-                <CheckCircle size={18} /> Mark as Available
+                <CheckCircle size={18} /> Mark Available
               </button>
             </div>
           </div>
         ))}
 
         {tasks.length === 0 && (
-          <div className="py-20 text-center bg-white/5 rounded-3xl border border-dashed border-white/10">
+          <div className="py-20 text-center bg-white/5 rounded-3xl border border-dashed border-white/20">
             <Wrench size={48} className="mx-auto text-gray-600 mb-4" />
-            <p className="text-gray-400 font-medium">No vehicles currently under maintenance.</p>
+            <p className="text-gray-400 font-medium">No vehicles currently require maintenance.</p>
           </div>
         )}
       </div>

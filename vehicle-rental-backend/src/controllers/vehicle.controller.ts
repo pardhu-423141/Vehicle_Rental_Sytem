@@ -1,25 +1,56 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { Role } from '@prisma/client';
+import { PrismaClient, Role, VehicleType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Extend Request type to include the user object from your auth middleware
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
-    role: Role; // Change from 'string' to 'Role'
+    role: Role;
   };
 }
 
-// 1. ADD VEHICLE (Admin/Vehicle Manager Only)
-export const addVehicle = async (req: AuthenticatedRequest, res: Response) => {
+// Helper to map Type to Seating Capacity automatically
+const getSeatingCapacity = (type: VehicleType): number => {
+  switch (type) {
+    case 'TWO_WHEELER': return 2;
+    case 'FOUR_SEATER': return 4;
+    case 'FIVE_SEATER': return 5;
+    case 'SEVEN_SEATER': return 7;
+    case 'LUXURY': return 4; 
+    default: return 5;
+  }
+};
+
+// 1. ADD VEHICLE (Updated to check for soft-deleted vehicles)
+export const addVehicle = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
   try {
     const { 
       make, model, year, licensePlate, color, 
-      fuelType, transmission, rentalRate, imageUrl 
+      fuelType, transmission, rentalRate, imageUrl, type 
     } = req.body;
+
+    // Check if the license plate already exists
+    const existingVehicle = await prisma.vehicle.findUnique({
+      where: { licensePlate }
+    });
+
+    if (existingVehicle) {
+      // If it exists but is soft-deleted, send a specific 409 status 
+      // so the frontend knows to ask the user to restore it
+      if (existingVehicle.status === 'Unavailable' || existingVehicle.deletedAt !== null) {
+        return res.status(409).json({ 
+          error: "Vehicle with this license plate already exists in history. Do you want to restore it?",
+          needsRestoration: true,
+          existingVehicleId: existingVehicle.id
+        });
+      }
+      return res.status(400).json({ error: "A vehicle with this license plate already exists." });
+    }
+
+    const vehicleType = type as VehicleType;
+    const seatingCapacity = getSeatingCapacity(vehicleType);
 
     const newVehicle = await prisma.vehicle.create({
       data: {
@@ -30,30 +61,39 @@ export const addVehicle = async (req: AuthenticatedRequest, res: Response) => {
         color,
         fuelType,
         transmission,
-        rentalRate: parseFloat(rentalRate),
+        rentalRate: parseFloat(rentalRate.toString()),
         imageUrl,
+        type: vehicleType,
+        seatingCapacity: seatingCapacity
       },
     });
 
     res.status(201).json(newVehicle);
   } catch (error: any) {
     console.error("Add vehicle error:", error);
-    res.status(500).json({ error: "Could not add vehicle. Check if License Plate is unique." });
+    res.status(500).json({ error: "Could not add vehicle. Ensure data is valid." });
   }
 };
 
 // 2. UPDATE VEHICLE
-export const updateVehicle = async (req: AuthenticatedRequest, res: Response) => {
+export const updateVehicle = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const updateData = req.body;
+
   try {
-    const updated = await prisma.vehicle.update({
+    // If status is coming back as Available, we ensure deletedAt is cleared
+    if (updateData.status === 'Available') {
+      updateData.deletedAt = null;
+    }
+
+    const vehicle = await prisma.vehicle.update({
       where: { id },
-      data: req.body, // Make sure to validate this in a real app!
+      data: updateData,
     });
-    res.status(200).json(updated);
-  } catch (error: any) {
-    console.error("Update vehicle error:", error);
-    res.status(500).json({ error: "Update failed. Vehicle not found." });
+    
+    res.json(vehicle);
+  } catch (error) {
+    res.status(500).json({ error: "Could not update vehicle. Ensure data types are correct." });
   }
 };
 
@@ -61,31 +101,61 @@ export const updateVehicle = async (req: AuthenticatedRequest, res: Response) =>
 export const removeVehicle = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   try {
-    // We don't delete from DB, we just set the deletedAt timestamp
     await prisma.vehicle.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: { 
+        deletedAt: new Date(),
+        status: 'Unavailable' 
+      },
     });
-    res.status(200).json({ message: "Vehicle removed and moved to history." });
+    res.status(200).json({ message: "Vehicle moved to history." });
   } catch (error: any) {
-    console.error("Remove vehicle error:", error);
     res.status(500).json({ error: "Removal failed." });
   }
 };
 
-// 4. GET VEHICLES (Conditional Visibility)
+// 4. GET VEHICLES
 export const getVehicles = async (req: AuthenticatedRequest, res: Response) => {
   const isAdmin = req.user?.role === 'ADMIN';
   
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
   try {
     const vehicles = await prisma.vehicle.findMany({
       where: isAdmin 
-        ? {} 
-        : { deletedAt: null } 
+        ? {
+            OR: [
+              { deletedAt: null },
+              { deletedAt: { gte: sixMonthsAgo } }
+            ]
+          } 
+        : { 
+            deletedAt: null,
+            status: 'Available' 
+          },
+      orderBy: { createdAt: 'desc' }
     });
     res.status(200).json(vehicles);
   } catch (error: any) {
-    console.error("Get vehicles error:", error);
     res.status(500).json({ error: "Failed to fetch vehicles." });
+  }
+};
+
+// 5. RESTORE VEHICLE (NEW FUNCTION)
+export const restoreVehicle = async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const restoredVehicle = await prisma.vehicle.update({
+      where: { id },
+      data: {
+        status: 'Available',
+        deletedAt: null // Explicitly clear the soft-delete timestamp
+      }
+    });
+    res.status(200).json({ message: "Vehicle successfully restored to the active fleet.", vehicle: restoredVehicle });
+  } catch (error: any) {
+    console.error("Restore error:", error);
+    res.status(500).json({ error: "Failed to restore the vehicle." });
   }
 };

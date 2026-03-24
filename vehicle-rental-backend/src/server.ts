@@ -16,13 +16,21 @@ import userRoutes from './routes/user.routes';
 import './config/db';   // Ensures DB connection is tested on startup
 import './config/cron'; // Starts the 6-month auto-delete background task
 
+
+
+
 const app = express();
 
-// 3. Middlewares
-app.use(cors({ 
-  origin: 'http://localhost:5173', // Your Vite/React frontend port
-  credentials: true                // Required to allow auth_token cookies
+app.use(cors({
+  origin: 'http://localhost:5173', // Replace with your Frontend URL (Vite/React)
+  credentials: true,               // Essential for sending JWT cookies
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+
+// 3. Middlewares
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -34,6 +42,9 @@ app.use('/api/reviews', reviewRoutes);    // Feedback & Ratings
 app.use('/api/kyc', kycRoutes);           // Identity Verification
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
+
+// Mount the KYC routes under the /api/admin prefix
+app.use('/api/admin/kyc', kycRoutes);
 
 // 5. Global Error Handler (Optional but Recommended)
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
