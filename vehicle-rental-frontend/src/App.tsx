@@ -37,9 +37,8 @@ export default function App(): JSX.Element {
       
       <Routes>
         {/* Everything inside this Layout route will have the glassmorphism background and Navbar */}
+        <Route path="/" element={<Home />} />
         <Route element={<Layout />}>
-          <Route path="/" element={<Home />} />
-
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           
