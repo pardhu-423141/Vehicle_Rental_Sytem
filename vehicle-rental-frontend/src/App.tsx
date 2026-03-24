@@ -25,6 +25,7 @@ import ServiceInbox from './pages/manager/Maintenance';
 import KycQueue from './pages/userManager/KycQueue';
 import UserDirectory from './pages/userManager/UserDirectory';
 import { PublicRoute } from './components/PublicRoute';
+import UserManagerDashboard from './pages/userManager/Dashboard';
 
 export default function App(): JSX.Element {
   return (
@@ -58,6 +59,7 @@ export default function App(): JSX.Element {
           <Route path="/manager/operations" element={<ManagerOperations />} />
           <Route path="/manager/fleet" element={<MyFleet />} />
           <Route path="/manager/maintenance" element={<ServiceInbox />} />
+          <Route path="/user-manager/dashboard" element={<UserManagerDashboard />} />
           <Route path="/user-manager/kyc" element={<KycQueue />} />
           <Route path="/user-manager/directory" element={<UserDirectory />} />
         </Route>

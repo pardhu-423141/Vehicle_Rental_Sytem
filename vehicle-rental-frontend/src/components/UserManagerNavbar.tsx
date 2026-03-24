@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Activity, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Users, ShieldCheck, Bell, UserCircle } from 'lucide-react';
 
@@ -8,7 +8,8 @@ export default function UserManagerNavbar() {
   const location = useLocation();
 
   // Navigation Links strictly for the User Manager workflow
-  const navLinks = [
+ const navLinks = [
+    { name: 'Dashboard', path: '/user-manager/dashboard', icon: Activity }, // Add this!
     { name: 'KYC Queue', path: '/user-manager/kyc', icon: ShieldCheck },
     { name: 'User Directory', path: '/user-manager/directory', icon: Users },
   ];
