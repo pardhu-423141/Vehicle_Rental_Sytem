@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { Search, UserCheck, UserX, ShieldCheck, Mail, Phone } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, UserCheck, UserX, ShieldCheck, Mail, Phone, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '../api/axios';
 
 interface User {
   id: string;
@@ -7,24 +9,112 @@ interface User {
   email: string;
   phone: string;
   trips: number;
-  status: 'Verified' | 'Pending' | 'Suspended';
+  status: string;
   joinDate: string;
 }
 
-const MOCK_USERS: User[] = [
-  { id: 'USR-001', name: 'Hruthwik Jayanth', email: 'hruthwik@nitap.ac.in', phone: '+91 98765 43210', trips: 12, status: 'Verified', joinDate: '2025-12-01' },
-  { id: 'USR-002', name: 'Ananya Rao', email: 'ananya.r@example.com', phone: '+91 87654 32109', trips: 0, status: 'Pending', joinDate: '2026-02-15' },
-  { id: 'USR-003', name: 'Suresh Kumar', email: 'suresh.k@demo.com', phone: '+91 76543 21098', trips: 24, status: 'Verified', joinDate: '2025-10-10' },
-  { id: 'USR-004', name: 'Priya Singh', email: 'priya.s@web.com', phone: '+91 65432 10987', trips: 3, status: 'Suspended', joinDate: '2026-01-05' },
-];
-
 export default function UserManagement() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredUsers = MOCK_USERS.filter(user => 
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  // 1. Fetch Real Users from Database
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get('/admin/users'); 
+      
+      // ⚡ DEBUG: Check your browser's Developer Tools Console to see this!
+      console.log("Raw backend response for users:", data);
+
+      // ⚡ BULLETPROOF EXTRACTION: Check all common ways backends send arrays
+      let usersArray: any[] = [];
+      
+      if (Array.isArray(data)) {
+        usersArray = data; // If backend sends just the array: [...]
+      } else if (data && Array.isArray(data.data)) {
+        usersArray = data.data; // If backend sends: { data: [...] }
+      } else if (data && Array.isArray(data.users)) {
+        usersArray = data.users; // If backend sends: { users: [...] }
+      } else if (data?.data && Array.isArray(data.data.users)) {
+        usersArray = data.data.users; // If backend sends: { data: { users: [...] } }
+      } else {
+        console.warn("Could not find an array in the backend response!");
+      }
+
+      const mappedUsers = usersArray.map((u: any) => {
+        let uiStatus = 'Pending';
+        const rawStatus = (u.kycStatus || u.status || '').toUpperCase();
+        if (rawStatus === 'APPROVED') uiStatus = 'Verified';
+        if (rawStatus === 'REJECTED' || rawStatus === 'SUSPENDED') uiStatus = 'Suspended';
+
+        return {
+          // Fallbacks added for every field just in case your DB names them differently
+          id: u._id || u.id, 
+          name: u.name || u.firstName || 'Unknown User',
+          email: u.email || 'N/A',
+          phone: u.phone || u.phoneNumber || 'N/A',
+          trips: u.trips || 0,
+          status: uiStatus,
+          joinDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown'
+        };
+      });
+
+      setUsers(mappedUsers);
+    } catch (error) {
+      console.error("Fetch Users Error:", error);
+      toast.error("Failed to load user directory.");
+      setUsers([]); 
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // 2. Handle Actions
+  const handleUserAction = async (userId: string, action: 'APPROVED' | 'SUSPENDED') => {
+    try {
+      // ⚡ Translate "SUSPENDED" to "REJECTED" because the KYC endpoint likely 
+      // only accepts "APPROVED" or "REJECTED" as valid database enums.
+      const backendStatus = action === 'SUSPENDED' ? 'REJECTED' : 'APPROVED';
+
+      await api.patch(`/admin/kyc/review/${userId}`, { status: backendStatus });
+      
+      toast.success(`User status updated successfully!`);
+      
+      // Update the UI immediately without refreshing the page
+      setUsers(prev => prev.map(u => {
+        if (u.id === userId) {
+          return { ...u, status: action === 'APPROVED' ? 'Verified' : 'Suspended' };
+        }
+        return u;
+      }));
+    } catch (error: any) {
+      // ⚡ THIS IS THE MAGIC BULLET FOR DEBUGGING 400 ERRORS:
+      // It will print the exact validation error your backend is throwing
+      console.error("Backend Error Details:", error.response?.data || error.message);
+      
+      const errorMessage = error.response?.data?.message || "Failed to update user status.";
+      toast.error(errorMessage);
+    }
+  };
+
+  const filteredUsers = users.filter(user => 
+    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-white">
+        <Loader2 className="animate-spin mb-4 text-blue-500" size={40} />
+        <p className="text-gray-400 font-medium">Loading user directory...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-7xl px-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -67,7 +157,7 @@ export default function UserManagement() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-blue-600/30 border border-blue-400/50 flex items-center justify-center text-blue-200 font-bold">
-                        {user.name.charAt(0)}
+                        {user.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="text-sm font-bold text-white">{user.name}</div>
@@ -108,13 +198,23 @@ export default function UserManagement() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       {user.status === 'Pending' && (
-                        <button title="Verify User" className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/40 transition">
+                        <button 
+                          onClick={() => handleUserAction(user.id, 'APPROVED')}
+                          title="Verify User" 
+                          className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/40 transition"
+                        >
                           <UserCheck size={16} />
                         </button>
                       )}
-                      <button title="Suspend User" className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/40 transition">
-                        <UserX size={16} />
-                      </button>
+                      {user.status !== 'Suspended' && (
+                        <button 
+                          onClick={() => handleUserAction(user.id, 'SUSPENDED')}
+                          title="Suspend User" 
+                          className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/40 transition"
+                        >
+                          <UserX size={16} />
+                        </button>
+                      )}
                       <button title="View Details" className="p-2 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10 transition">
                         <ShieldCheck size={16} />
                       </button>
@@ -122,6 +222,15 @@ export default function UserManagement() {
                   </td>
                 </tr>
               ))}
+              
+              {/* Empty State Fallback */}
+              {filteredUsers.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                    No users found matching your search criteria.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
