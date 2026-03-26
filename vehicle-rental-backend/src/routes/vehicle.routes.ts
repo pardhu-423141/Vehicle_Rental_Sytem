@@ -3,7 +3,8 @@ import {
   addVehicle, 
   updateVehicle, 
   removeVehicle, 
-  getVehicles 
+  getVehicles, 
+  getVehicleById
 } from '../controllers/vehicle.controller';
 import { authenticate, authorize, isAdmin } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -31,5 +32,5 @@ router.put(
 // Only ADMIN can remove (Soft Delete) as per your requirement
 router.delete('/remove/:id', authenticate, isAdmin, removeVehicle);
 
-
+router.get('/:id', authenticate, getVehicleById);
 export default router;

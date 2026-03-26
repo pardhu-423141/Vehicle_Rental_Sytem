@@ -15,7 +15,6 @@ router.post('/', authenticate, isVerifiedUser, createBooking);
  * @desc    Create a new vehicle booking
  * @access  Private (Registered users only)
  */
-router.post('/', authenticate, createBooking);
 
 /**
  * @route   GET /api/bookings/my-bookings

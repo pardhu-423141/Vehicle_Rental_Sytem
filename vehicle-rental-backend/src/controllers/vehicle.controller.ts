@@ -159,3 +159,32 @@ export const restoreVehicle = async (req: AuthenticatedRequest, res: Response) =
     res.status(500).json({ error: "Failed to restore the vehicle." });
   }
 };
+
+// Add this function to your existing controller file (where addVehicle, getVehicles, etc. are defined)
+
+export const getVehicleById = async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const isAdmin = req.user?.role === 'ADMIN';
+
+  try {
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id },
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found." });
+    }
+
+    // Non‑admins can only see active, available vehicles
+    if (!isAdmin) {
+      if (vehicle.deletedAt !== null || vehicle.status !== 'Available') {
+        return res.status(404).json({ error: "Vehicle not found or not available." });
+      }
+    }
+
+    res.status(200).json(vehicle);
+  } catch (error) {
+    console.error("Get vehicle by id error:", error);
+    res.status(500).json({ error: "Failed to fetch vehicle." });
+  }
+};

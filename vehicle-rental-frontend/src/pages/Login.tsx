@@ -86,12 +86,7 @@ export default function Login() {
               value={formData.password}
               onChange={(v: string) => setFormData({...formData, password: v})}
             />
-            <button 
-              type="button" 
-              className="absolute right-1 bottom-4 text-[10px] font-bold text-blue-400 uppercase tracking-tighter hover:text-blue-300 transition"
-            >
-              Forgot?
-            </button>
+            
           </div>
 
           <button 

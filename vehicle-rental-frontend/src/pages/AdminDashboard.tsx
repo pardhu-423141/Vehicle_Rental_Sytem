@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import api from '../api/axios';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -15,7 +16,7 @@ export default function AdminDashboard() {
     // AdminDashboard.tsx
     const fetchDashboardData = async () => {
       try {
-        const { data } = await axios.get('/admin/stats'); // This now sends the token!
+        const { data } = await api.get('/admin/stats'); // This now sends the token!
         setStats(data);
         setLoading(false);
        
