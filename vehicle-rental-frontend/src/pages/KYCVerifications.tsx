@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, ShieldCheck, ShieldAlert, Eye, CheckCircle, XCircle, FileText, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import api from '../api/axios'; // ⚡ Swapped to your custom API instance
 
 export default function KYCVerifications() {
   const [kycRequests, setKycRequests] = useState<any[]>([]);
@@ -9,28 +9,41 @@ export default function KYCVerifications() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // 1. Fetch real data from backend
-  // Inside KYCVerifications.tsx
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
-      // If baseURL is /api/admin, this results in /api/admin/kyc/submissions
-      const { data } = await axios.get('admin/kyc/submissions'); 
-      setKycRequests(data);
+      // ⚡ Added leading slash and using 'api' instance
+      const { data } = await api.get('/admin/kyc/submissions'); 
+      
+      // ⚡ SAFETY CHECK: Guarantee we are storing an array
+      if (Array.isArray(data)) {
+        setKycRequests(data);
+      } else if (data && Array.isArray(data.data)) {
+        // If your backend wrapped the array in a "data" object
+        setKycRequests(data.data);
+      } else {
+        console.warn("Unexpected data format received:", data);
+        setKycRequests([]); // Fallback to an empty array so .filter() never crashes
+      }
+
     } catch (err) {
       console.error("KYC Fetch Error:", err);
-      toast.error("Endpoint not found. Check server logs.");
+      toast.error("Failed to load KYC submissions.");
+      setKycRequests([]); // Ensure it stays an array even on error
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchSubmissions(); }, []);
+  useEffect(() => { 
+    fetchSubmissions(); 
+  }, []);
 
   // 2. Handle Approve/Reject Action
   const handleAction = async (userId: string, userName: string, action: 'APPROVED' | 'REJECTED') => {
     try {
-      // Hits PATCH /api/kyc/review/:userId
-      await axios.patch(`/admin/kyc/review/${userId}`, { status: action });
+      // ⚡ Using 'api' instance here too
+      await api.patch(`/admin/kyc/review/${userId}`, { status: action });
       
       toast.success(`${userName} has been ${action.toLowerCase()}`);
       
@@ -43,9 +56,10 @@ export default function KYCVerifications() {
     }
   };
 
+  // ⚡ kycRequests is now guaranteed to be an array, so this will never crash
   const filteredRequests = kycRequests.filter(req => 
-    req.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    req.email.toLowerCase().includes(searchTerm.toLowerCase())
+    req.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    req.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" size={40}/></div>;
@@ -110,7 +124,10 @@ export default function KYCVerifications() {
                     <div className="flex justify-end gap-2">
                       <button onClick={() => handleAction(request.id, request.name, 'APPROVED')} className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/40"><CheckCircle size={18} /></button>
                       <button onClick={() => handleAction(request.id, request.name, 'REJECTED')} className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/40"><XCircle size={18} /></button>
-                      <a href={request.kycData?.idImageFront} target="_blank" rel="noreferrer" className="p-2 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10"><Eye size={18} /></a>
+                      {/* Added safety check for the href */}
+                      {request.kycData?.idImageFront && (
+                        <a href={request.kycData.idImageFront} target="_blank" rel="noreferrer" className="p-2 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10"><Eye size={18} /></a>
+                      )}
                     </div>
                   ) : (
                     <span className="text-[10px] text-gray-500 italic">Completed</span>
@@ -118,6 +135,15 @@ export default function KYCVerifications() {
                 </td>
               </tr>
             ))}
+            
+            {/* Added a friendly empty state */}
+            {filteredRequests.length === 0 && !loading && (
+              <tr>
+                <td colSpan={4} className="px-6 py-10 text-center text-gray-500">
+                  No KYC requests found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

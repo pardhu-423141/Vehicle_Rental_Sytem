@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { UserPlus, Search, Mail, Shield, Wrench, UserCog, MoreVertical, LayoutGrid, List } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserPlus, Search, Mail, Shield, Wrench, UserCog, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '../api/axios'; // ⚡ Ensure this points to your custom axios instance
 import AddStaffModal from '../components/AddStaffModal';
 
 interface StaffMember {
@@ -7,27 +9,87 @@ interface StaffMember {
   name: string;
   role: 'User Manager' | 'Vehicle Manager';
   email: string;
-  assignedTasks: number; // For User Mgr: Pending KYCs | For Vehicle Mgr: Assigned Vehicles
+  assignedTasks: number;
   status: 'Active' | 'On Leave' | 'Inactive';
 }
 
-const MOCK_STAFF: StaffMember[] = [
-  { id: 'STF-001', name: 'Suresh V.', role: 'Vehicle Manager', email: 'suresh.v@driveadmin.com', assignedTasks: 5, status: 'Active' },
-  { id: 'STF-002', name: 'Ananya R.', role: 'User Manager', email: 'ananya.r@driveadmin.com', assignedTasks: 12, status: 'Active' },
-  { id: 'STF-003', name: 'Rahul S.', role: 'Vehicle Manager', email: 'rahul.s@driveadmin.com', assignedTasks: 3, status: 'On Leave' },
-  { id: 'STF-004', name: 'Mahesh K.', role: 'Vehicle Manager', email: 'mahesh.k@driveadmin.com', assignedTasks: 8, status: 'Active' },
-];
-
 export default function StaffManagement() {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  // const [viewMode, setViewMode] = useState<'grid' | 'list'>('list'); // Retained if you plan to use it later
 
-  // Filter staff based on search input
-  const filteredStaff = MOCK_STAFF.filter(staff => 
-    staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    staff.email.toLowerCase().includes(searchTerm.toLowerCase())
+  // 1. Fetch Real Staff from Database
+  const fetchStaff = async () => {
+    try {
+      setLoading(true);
+      // ⚡ Update this endpoint if your backend route differs
+      const { data } = await api.get('/admin/staff');
+
+      // ⚡ BULLETPROOF EXTRACTION: Check all common backend response structures
+      let staffArray: any[] = [];
+      if (Array.isArray(data)) {
+        staffArray = data;
+      } else if (data && Array.isArray(data.data)) {
+        staffArray = data.data;
+      } else if (data && Array.isArray(data.staff)) {
+        staffArray = data.staff;
+      } else if (data?.data && Array.isArray(data.data.staff)) {
+        staffArray = data.data.staff;
+      }
+
+      // Map backend data to our frontend interface
+      const mappedStaff: StaffMember[] = staffArray.map((s: any) => {
+        // Handle Role Enums (e.g., USER_MANAGER -> User Manager)
+        const rawRole = (s.role || '').toUpperCase();
+        const role = rawRole.includes('USER') ? 'User Manager' : 'Vehicle Manager';
+
+        // Handle Status Enums
+        const rawStatus = (s.status || 'ACTIVE').toUpperCase();
+        let status: 'Active' | 'On Leave' | 'Inactive' = 'Active';
+        if (rawStatus === 'ON_LEAVE' || rawStatus === 'LEAVE') status = 'On Leave';
+        if (rawStatus === 'INACTIVE') status = 'Inactive';
+
+        return {
+          id: s._id || s.id,
+          name: s.name || s.firstName || 'Unknown Staff',
+          email: s.email || 'N/A',
+          role: role,
+          assignedTasks: s.assignedTasks || s.tasks || 0,
+          status: status
+        };
+      });
+
+      setStaff(mappedStaff);
+    } catch (error) {
+      console.error("Fetch Staff Error:", error);
+      toast.error("Failed to load staff directory.");
+      setStaff([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStaff();
+  }, []);
+
+  // Filter staff based on search input securely
+  const filteredStaff = staff.filter(member => 
+    member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    member.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Loading UI State
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-white">
+        <Loader2 className="animate-spin mb-4 text-blue-500" size={40} />
+        <p className="text-gray-400 font-medium">Loading staff directory...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-7xl px-4 animate-in fade-in duration-700">
@@ -77,17 +139,17 @@ export default function StaffManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredStaff.map((staff) => (
-                <tr key={staff.id} className="hover:bg-white/5 transition-colors group">
+              {filteredStaff.map((staffMember) => (
+                <tr key={staffMember.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-400/30 flex items-center justify-center text-blue-300 font-bold">
-                        {staff.name.charAt(0)}
+                      <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-400/30 flex items-center justify-center text-blue-300 font-bold uppercase">
+                        {staffMember.name.charAt(0)}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-white">{staff.name}</div>
+                        <div className="text-sm font-bold text-white">{staffMember.name}</div>
                         <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
-                          <Mail size={10} /> {staff.email}
+                          <Mail size={10} /> {staffMember.email}
                         </div>
                       </div>
                     </div>
@@ -96,7 +158,7 @@ export default function StaffManagement() {
                   {/* Role Badges */}
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-2">
-                      {staff.role === 'User Manager' ? (
+                      {staffMember.role === 'User Manager' ? (
                         <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-lg">
                            <Shield size={14} className="text-purple-400" />
                            <span className="text-[11px] font-bold text-purple-200">KYC Manager</span>
@@ -114,13 +176,13 @@ export default function StaffManagement() {
                   <td className="px-6 py-5">
                     <div className="flex flex-col gap-1.5">
                       <div className="flex justify-between text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
-                        <span>{staff.role === 'User Manager' ? 'Pending KYCs' : 'Assigned Fleet'}</span>
-                        <span className="text-white">{staff.assignedTasks}</span>
+                        <span>{staffMember.role === 'User Manager' ? 'Pending KYCs' : 'Assigned Fleet'}</span>
+                        <span className="text-white">{staffMember.assignedTasks}</span>
                       </div>
                       <div className="w-32 h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <div 
-                          className={`h-full rounded-full transition-all duration-1000 ${staff.role === 'User Manager' ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]' : 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]'}`} 
-                          style={{ width: `${(staff.assignedTasks / 15) * 100}%` }}
+                          className={`h-full rounded-full transition-all duration-1000 ${staffMember.role === 'User Manager' ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]' : 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]'}`} 
+                          style={{ width: `${Math.min((staffMember.assignedTasks / 15) * 100, 100)}%` }}
                         ></div>
                       </div>
                     </div>
@@ -128,11 +190,11 @@ export default function StaffManagement() {
 
                   <td className="px-6 py-5 text-center">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border backdrop-blur-md ${
-                      staff.status === 'Active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                      staff.status === 'On Leave' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                      staffMember.status === 'Active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                      staffMember.status === 'On Leave' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
                       'bg-red-500/20 text-red-400 border-red-500/30'
                     }`}>
-                      {staff.status}
+                      {staffMember.status}
                     </span>
                   </td>
 
@@ -143,6 +205,15 @@ export default function StaffManagement() {
                   </td>
                 </tr>
               ))}
+
+              {/* Empty State */}
+              {filteredStaff.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                    No staff members found matching your search criteria.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -169,7 +240,9 @@ export default function StaffManagement() {
       {/* Add Staff Modal Component */}
       <AddStaffModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => setIsModalOpen(false)}
+        /* If your modal takes a success callback to refresh the list, pass it here: */
+        /* onSuccess={() => fetchStaff()} */
       />
     </div>
   );

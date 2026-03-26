@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   Search, 
@@ -8,55 +8,117 @@ import {
   Clock, 
   MoreVertical,
   Mail,
-  Ban
+  Ban,
+  Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import api from '../../api/axios'; // ⚡ Using your custom axios instance!
 
-// Mock Data: The complete user database
-const INITIAL_USERS = [
-  { id: 'USR-8091', name: 'Hruthwik J.', email: 'hruthwik@example.com', phone: '+91 98765 43210', kycStatus: 'Approved', joined: 'Mar 15, 2026' },
-  { id: 'USR-8092', name: 'Aditi Sharma', email: 'aditi.s@example.com', phone: '+91 91234 56789', kycStatus: 'Pending', joined: 'Mar 19, 2026' },
-  { id: 'USR-8093', name: 'Rahul S.', email: 'rahul.s@example.com', phone: '+91 99887 77665', kycStatus: 'Approved', joined: 'Feb 10, 2026' },
-  { id: 'USR-8094', name: 'Kiran Kumar', email: 'kiran.k@example.com', phone: '+91 98765 11223', kycStatus: 'Incomplete', joined: 'Mar 20, 2026' },
-  { id: 'USR-8095', name: 'Priya M.', email: 'priya.m@example.com', phone: '+91 91919 28282', kycStatus: 'Rejected', joined: 'Mar 18, 2026' },
-];
+type KycStatus = 'All' | 'APPROVED' | 'PENDING' | 'INCOMPLETE' | 'REJECTED';
 
-type KycStatus = 'All' | 'Approved' | 'Pending' | 'Incomplete' | 'Rejected';
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  kycStatus: string;
+  joined: string;
+}
 
 export default function UserDirectory() {
-  const [users, setUsers] = useState(INITIAL_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<KycStatus>('All');
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  // 1. Fetch Real Users from Backend
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      // Ensure you have an endpoint like GET /api/admin/users
+      const { data } = await api.get('/admin/users');
+      
+      if (Array.isArray(data)) {
+        // Map backend fields to the format our frontend table expects
+        const mappedUsers = data.map((u: any) => ({
+          id: u.id,
+          name: u.name || 'Unknown User',
+          email: u.email || 'N/A',
+          phone: u.phone || 'N/A',
+          kycStatus: u.kycStatus ? u.kycStatus.toUpperCase() : 'INCOMPLETE',
+          joined: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown'
+        }));
+        setUsers(mappedUsers);
+      } else if (data && Array.isArray(data.data)) {
+        // Fallback in case backend sends { data: [...] }
+        const mappedUsers = data.data.map((u: any) => ({
+          id: u.id,
+          name: u.name || 'Unknown User',
+          email: u.email || 'N/A',
+          phone: u.phone || 'N/A',
+          kycStatus: u.kycStatus ? u.kycStatus.toUpperCase() : 'INCOMPLETE',
+          joined: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown'
+        }));
+        setUsers(mappedUsers);
+      } else {
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error("Fetch Users Error:", error);
+      toast.error("Failed to load user directory.");
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   // Filter Logic
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           user.id.toLowerCase().includes(searchQuery.toLowerCase());
+                          
     const matchesStatus = statusFilter === 'All' || user.kycStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const handleAction = (userId: string, action: string) => {
+  // 2. Handle Actions (like Revoking KYC)
+  const handleAction = async (userId: string, action: string) => {
     setActiveDropdown(null);
+    
     if (action === 'revoke') {
-      setUsers(users.map(u => u.id === userId ? { ...u, kycStatus: 'Incomplete' } : u));
-      toast.success(`KYC revoked for ${userId}. They must re-verify.`);
+      try {
+        // Reusing the KYC review endpoint to reject/revoke their status
+        await api.patch(`/admin/kyc/review/${userId}`, { status: 'REJECTED' });
+        
+        // Update local state to reflect the change immediately
+        setUsers(users.map(u => u.id === userId ? { ...u, kycStatus: 'REJECTED' } : u));
+        toast.success(`KYC revoked for user. They must re-verify.`);
+      } catch (error) {
+        console.error("Revoke Error:", error);
+        toast.error("Failed to revoke KYC status.");
+      }
     } else {
-      toast.success(`${action} action triggered for ${userId}`);
+      toast.success(`${action} action triggered (Backend implementation pending)`);
     }
   };
 
-  // Helper for Status Badges
+  // Helper for Status Badges (Updated to expect Uppercase matching backend)
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Approved': return <span className="px-2.5 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 w-fit"><ShieldCheck size={12}/> Approved</span>;
-      case 'Pending': return <span className="px-2.5 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 w-fit"><Clock size={12}/> Pending</span>;
-      case 'Rejected': return <span className="px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 w-fit"><ShieldAlert size={12}/> Rejected</span>;
+      case 'APPROVED': return <span className="px-2.5 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 w-fit"><ShieldCheck size={12}/> Approved</span>;
+      case 'PENDING': return <span className="px-2.5 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 w-fit"><Clock size={12}/> Pending</span>;
+      case 'REJECTED': return <span className="px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 w-fit"><ShieldAlert size={12}/> Rejected</span>;
       default: return <span className="px-2.5 py-1 bg-gray-500/10 text-gray-400 border border-gray-500/20 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 w-fit">Incomplete</span>;
     }
   };
+
+  if (loading) return <div className="p-20 text-center flex flex-col items-center"><Loader2 className="animate-spin text-purple-500 mb-4" size={40}/><p className="text-gray-400">Loading directory...</p></div>;
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 animate-in fade-in duration-700 pt-8 pb-12">
@@ -102,10 +164,10 @@ export default function UserDirectory() {
             className="w-full pl-11 pr-10 py-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none focus:border-purple-500 transition text-sm appearance-none cursor-pointer"
           >
             <option value="All">All Statuses</option>
-            <option value="Approved">Approved</option>
-            <option value="Pending">Pending Review</option>
-            <option value="Incomplete">Incomplete</option>
-            <option value="Rejected">Rejected</option>
+            <option value="APPROVED">Approved</option>
+            <option value="PENDING">Pending Review</option>
+            <option value="INCOMPLETE">Incomplete</option>
+            <option value="REJECTED">Rejected</option>
           </select>
         </div>
       </div>
@@ -135,7 +197,7 @@ export default function UserDirectory() {
                   <td className="p-4 pl-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 font-bold">
-                        {user.name.charAt(0)}
+                        {user.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <p className="text-sm font-bold text-white group-hover:text-purple-400 transition-colors">{user.name}</p>
