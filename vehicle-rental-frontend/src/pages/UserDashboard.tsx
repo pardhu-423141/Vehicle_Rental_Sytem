@@ -142,20 +142,7 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* 3. Quick Wallet Card */}
-        <div className="p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col justify-center relative group">
-          <div className="flex items-center gap-3 text-gray-500 mb-2">
-            <CreditCard size={18} />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Available Credits</span>
-          </div>
-          <p className="text-5xl font-black text-white tracking-tighter">
-            ₹{userData?.walletBalance || 0}
-          </p>
-          <button className="mt-6 text-xs text-blue-400 hover:text-blue-300 font-black uppercase tracking-widest flex items-center gap-2 transition-all">
-            <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">+</div>
-            Top Up Wallet
-          </button>
-        </div>
+        
       </div>
 
       {/* 4. Active Ride Section */}

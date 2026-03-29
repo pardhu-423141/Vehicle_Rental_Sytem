@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/axios';
+import { useLocation } from 'react-router-dom';
 
 interface User {
   id: string;
@@ -22,34 +23,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const checkAuthStatus = async () => {
-      // 1. Efficient Check: If no hint of a user exists locally, 
-      // skip the server call and go straight to "Not Logged In"
-      const hint = localStorage.getItem('fleet_user');
-      
-      if (!hint) {
-        setLoading(false);
-        return; 
-      }
+  const location = useLocation();
 
-      try {
-        // 2. Verified Check: If a hint exists, verify it with the server
-        const res = await api.get('/user/profile'); 
-        setUser(res.data);
-        localStorage.setItem('fleet_user', JSON.stringify(res.data)); // Keep it synced
-      } catch (err) {
-        // 3. Cleanup: If the cookie is dead, wipe the local hint
-        setUser(null);
-        localStorage.removeItem('fleet_user');
-      } finally {
-        setLoading(false); 
-      }
-    };
+useEffect(() => {
+  const checkAuthStatus = async () => {
+    const hint = localStorage.getItem('fleet_user');
+    
+    if (!hint) {
+      setLoading(false);
+      return; 
+    }
 
-    checkAuthStatus();
-  }, []);
+    try {
+      const res = await api.get('/user/profile'); 
+      setUser(res.data);
+      localStorage.setItem('fleet_user', JSON.stringify(res.data));
+    } catch (err) {
+      setUser(null);
+      localStorage.removeItem('fleet_user');
+    } finally {
+      setLoading(false); 
+    }
+  };
 
+  checkAuthStatus();
+}, [location.pathname]);
   const login = (userData: User) => {
     setUser(userData);
     localStorage.setItem('fleet_user', JSON.stringify(userData));

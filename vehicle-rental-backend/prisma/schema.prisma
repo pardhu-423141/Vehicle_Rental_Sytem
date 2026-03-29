@@ -34,7 +34,7 @@ model User {
   otpExpires   DateTime? 
 
   // KYC & Profile
-  kycStatus    KYCStatus @default(NOT_SUBMITTED)
+  kycStatus KYCStatus @default(NOT_SUBMITTED)
   kycData      KYCData?
   
   // Relations & Timestamps
@@ -43,6 +43,14 @@ model User {
   bookings     Booking[]
   reviews      Review[]
 }
+enum VehicleType {
+  TWO_WHEELER
+  FOUR_SEATER
+  FIVE_SEATER
+  SEVEN_SEATER
+  LUXURY
+}
+
 model Vehicle {
   id            String    @id @default(uuid())
   make          String    // e.g., Toyota
@@ -55,13 +63,18 @@ model Vehicle {
   rentalRate    Float     // Price per day/hour
   imageUrl      String?
   
-  // Status & Soft Delete Logic
-  status        String    @default("available") // available, rented, maintenance
+  // --- NEW FIELDS ---
+  type          VehicleType @default(FIVE_SEATER)
+  seatingCapacity Int       @default(5) 
+  // ------------------
+
+  status        String    @default("available") 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime? // Null means active. A date means "removed" but kept in history.
-  bookings    Booking[]
-  reviews     Review[]
+  deletedAt     DateTime? 
+  
+  bookings      Booking[]
+  reviews       Review[]
 }
 
 model Booking {

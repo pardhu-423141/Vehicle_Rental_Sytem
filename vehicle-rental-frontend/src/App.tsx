@@ -29,8 +29,9 @@ import UserManagerDashboard from './pages/userManager/Dashboard';
 
 export default function App(): JSX.Element {
   return (
-    <AuthProvider>
+    
     <Router>
+      <AuthProvider>
       <Toaster position="top-center" toastOptions={{ 
         style: { background: '#333', color: '#fff' } 
       }} />
@@ -63,7 +64,8 @@ export default function App(): JSX.Element {
           <Route path="/user-manager/directory" element={<UserDirectory />} />
         </Route>
       </Routes>
+      </AuthProvider>
     </Router>
-    </AuthProvider>
+    
   );
 }
