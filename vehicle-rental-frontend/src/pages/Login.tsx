@@ -39,9 +39,13 @@ export default function Login() {
 
       // Navigate based on user role
       if (user.role === 'ADMIN') {
-        navigate('/admin');
+        navigate('/admin/dashboard'); 
+      } else if (user.role === 'USER_MANAGER') {
+        navigate('/user-manager/dashboard'); // <--- Sends them to our new page!
+      } else if (user.role === 'VEHICLE_MANAGER') {
+        navigate('/manager/fleet'); 
       } else {
-        navigate('/Userdashboard');
+        navigate('/Userdashboard'); // Default for regular customers
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Authorization failed');

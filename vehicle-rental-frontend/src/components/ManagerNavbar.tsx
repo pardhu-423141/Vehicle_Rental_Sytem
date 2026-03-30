@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Car, ArrowRightLeft, Wrench, Bell, UserCircle } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Car, ArrowRightLeft, Wrench, Bell, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext'; // Import context
+import toast from 'react-hot-toast';
 
 export default function ManagerNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false); // New state for profile menu
+  
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth(); // Grab user data and logout function
 
   const navLinks = [
     { name: 'My Fleet', path: '/manager/fleet', icon: Car },
@@ -19,6 +25,17 @@ export default function ManagerNavbar() {
     { id: 2, title: 'Upcoming Handover', message: 'Customer Hruthwik J. arriving in 15 mins for Tata Nexon EV.', time: '10m ago', isRead: false, type: 'info' },
     { id: 3, title: 'Late Return Warning', message: 'Suzuki Swift (AP-39-DX-9012) is 30 mins past scheduled drop-off.', time: '1h ago', isRead: true, type: 'warning' },
   ];
+
+  // Handle Logout
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success("Logged out successfully");
+      navigate('/login'); // Or your designated auth route
+    } catch (error) {
+      toast.error("Failed to logout");
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 w-full z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10 shadow-lg shadow-black/20">
@@ -105,15 +122,43 @@ export default function ManagerNavbar() {
               </div>
             )}
 
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10 ml-2">
-              <div className="text-right">
-                <p className="text-sm font-bold text-white leading-none">Mahesh K.</p>
-                <p className="text-[10px] text-blue-400 uppercase tracking-widest mt-1">Vehicle Mgr</p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                <UserCircle size={24} />
-              </div>
+            {/* --- UPDATED DYNAMIC PROFILE SECTION --- */}
+            <div className="relative flex items-center pl-4 border-l border-white/10 ml-2">
+              <button 
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="flex items-center gap-3 text-left focus:outline-none group"
+              >
+                <div className="text-right">
+                  <p className="text-sm font-bold text-white leading-none group-hover:text-blue-300 transition-colors">
+                    {user?.name || 'Manager'}
+                  </p>
+                  <p className="text-[10px] text-blue-400 uppercase tracking-widest mt-1">
+                    Vehicle Mgr
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-lg group-hover:bg-blue-600/30 transition-all">
+                  {user?.name?.charAt(0).toUpperCase() || 'M'}
+                </div>
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {isProfileOpen && (
+                <div className="absolute top-full right-0 mt-6 w-56 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                  <div className="px-4 py-3 border-b border-white/5 mb-1">
+                    <p className="text-sm font-bold text-white truncate">{user?.name}</p>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{user?.email}</p>
+                  </div>
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2 transition-colors"
+                  >
+                    <LogOut size={16} /> Logout
+                  </button>
+                </div>
+              )}
             </div>
+            {/* -------------------------------------- */}
+
           </div>
 
           <div className="md:hidden">

@@ -75,25 +75,38 @@ export const addVehicle = async (req: AuthenticatedRequest, res: Response): Prom
   }
 };
 
-// 2. UPDATE VEHICLE
-export const updateVehicle = async (req: Request, res: Response) => {
+// 2. UPDATE VEHICLE (Upgraded Security)
+export const updateVehicle = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const updateData = req.body;
+  const userRole = req.user?.role;
+  const userId = req.user?.id;
 
   try {
-    // If status is coming back as Available, we ensure deletedAt is cleared
+    // 🚨 SECURITY GATE: If a Manager is trying to update, ensure they own the vehicle!
+    if (userRole === 'VEHICLE_MANAGER') {
+      const vehicle = await prisma.vehicle.findUnique({ where: { id } });
+      
+      if (!vehicle || vehicle.managerId !== userId) {
+        return res.status(403).json({ error: "Unauthorized: You do not manage this vehicle." });
+      }
+      
+      // Prevent managers from reassigning the vehicle to someone else
+      delete updateData.managerId; 
+    }
+
     if (updateData.status === 'Available') {
       updateData.deletedAt = null;
     }
 
-    const vehicle = await prisma.vehicle.update({
+    const updatedVehicle = await prisma.vehicle.update({
       where: { id },
       data: updateData,
     });
     
-    res.json(vehicle);
+    res.json(updatedVehicle);
   } catch (error) {
-    res.status(500).json({ error: "Could not update vehicle. Ensure data types are correct." });
+    res.status(500).json({ error: "Could not update vehicle." });
   }
 };
 
@@ -114,26 +127,41 @@ export const removeVehicle = async (req: AuthenticatedRequest, res: Response) =>
   }
 };
 
-// 4. GET VEHICLES
+// 4. GET VEHICLES (Upgraded Visibility)
 export const getVehicles = async (req: AuthenticatedRequest, res: Response) => {
-  const isAdmin = req.user?.role === 'ADMIN';
+  const userRole = req.user?.role;
+  const userId = req.user?.id;
   
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
   try {
+    let whereClause: any = {};
+
+    if (userRole === 'ADMIN') {
+      // Admins see everything (including soft-deleted up to 6 months)
+      whereClause = {
+        OR: [
+          { deletedAt: null },
+          { deletedAt: { gte: sixMonthsAgo } }
+        ]
+      };
+    } else if (userRole === 'VEHICLE_MANAGER') {
+      // 🚨 THE FIX: Managers ONLY see vehicles assigned to their specific ID
+      whereClause = {
+        deletedAt: null,
+        managerId: userId // Only fetch rows where managerId matches their login ID
+      };
+    } else {
+      // Standard Users only see Available cars
+      whereClause = { 
+        deletedAt: null,
+        status: 'Available' 
+      };
+    }
+
     const vehicles = await prisma.vehicle.findMany({
-      where: isAdmin 
-        ? {
-            OR: [
-              { deletedAt: null },
-              { deletedAt: { gte: sixMonthsAgo } }
-            ]
-          } 
-        : { 
-            deletedAt: null,
-            status: 'Available' 
-          },
+      where: whereClause,
       orderBy: { createdAt: 'desc' }
     });
     res.status(200).json(vehicles);
@@ -186,5 +214,35 @@ export const getVehicleById = async (req: AuthenticatedRequest, res: Response) =
   } catch (error) {
     console.error("Get vehicle by id error:", error);
     res.status(500).json({ error: "Failed to fetch vehicle." });
+  }
+};
+// 6. GET VEHICLE HISTORY
+export const getVehicleHistory = async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    // Fetch all bookings for this specific vehicle, including the User who booked it
+    const bookings = await prisma.booking.findMany({
+      where: { vehicleId: id },
+      include: { 
+        user: { select: { name: true } } // Get the renter's name!
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Map the database data into a clean format for our frontend timeline
+    const history = bookings.map((b: any) => ({
+      id: b.id,
+      type: 'BOOKING',
+      date: new Date(b.createdAt).toLocaleDateString(), 
+      desc: `Rented by ${b.user?.name || 'Unknown User'}`,
+      duration: 'Standard', // If you have start/end dates in your DB, you can calculate days here!
+      status: b.status || 'Completed' // 'Active', 'Completed', etc.
+    }));
+
+    res.status(200).json(history);
+  } catch (error) {
+    console.error("Fetch history error:", error);
+    res.status(500).json({ error: "Failed to fetch vehicle history." });
   }
 };

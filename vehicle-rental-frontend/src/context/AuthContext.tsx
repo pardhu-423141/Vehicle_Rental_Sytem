@@ -25,29 +25,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const location = useLocation();
 
-useEffect(() => {
-  const checkAuthStatus = async () => {
-    const hint = localStorage.getItem('fleet_user');
-    
-    if (!hint) {
-      setLoading(false);
-      return; 
-    }
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      const hint = localStorage.getItem('fleet_user');
+      
+      if (!hint) {
+        setLoading(false);
+        return; 
+      }
 
-    try {
-      const res = await api.get('/user/profile'); 
-      setUser(res.data);
-      localStorage.setItem('fleet_user', JSON.stringify(res.data));
-    } catch (err) {
-      setUser(null);
-      localStorage.removeItem('fleet_user');
-    } finally {
-      setLoading(false); 
-    }
-  };
+      try {
+        const res = await api.get('/user/profile'); 
+        
+        // --- THE FIX STARTS HERE ---
+        // Safely unwrap the user object whether the backend sends { user: {...} } OR just {...}
+        const actualUser = res.data.user ? res.data.user : res.data;
+        
+        setUser(actualUser);
+        localStorage.setItem('fleet_user', JSON.stringify(actualUser));
+        // --- THE FIX ENDS HERE ---
 
-  checkAuthStatus();
-}, [location.pathname]);
+      } catch (err) {
+        setUser(null);
+        localStorage.removeItem('fleet_user');
+      } finally {
+        setLoading(false); 
+      }
+    };
+
+    checkAuthStatus();
+  }, [location.pathname]);
+
   const login = (userData: User) => {
     setUser(userData);
     localStorage.setItem('fleet_user', JSON.stringify(userData));
@@ -61,13 +69,11 @@ useEffect(() => {
     } finally {
       setUser(null);
       localStorage.removeItem('fleet_user');
-      // No window.location.href here to prevent forced reloads
     }
   };
 
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>
-      {/* 4. Smooth Loading: Don't show the app until the check is done */}
       {!loading ? children : (
         <div className="h-screen w-full flex items-center justify-center bg-[#0a0a0a]">
            <div className="flex flex-col items-center gap-4">

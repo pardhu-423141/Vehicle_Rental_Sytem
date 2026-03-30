@@ -1,24 +1,25 @@
 import type { JSX } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, ShieldCheck, Car, ArrowRight, Activity, Zap } from 'lucide-react';
-import { useAuth } from '../context/AuthContext'; // 1. Import Auth Context
+import { useAuth } from '../context/AuthContext'; 
 
 export default function Home(): JSX.Element {
-  const { user } = useAuth(); // 2. Pull user data
+  const { user } = useAuth(); 
 
-  // 3. Helper to determine the correct Command Center
+  // Helper to determine the correct Command Center
   const getDashboardPath = () => {
-    if (!user) return "/login"; // If guest, send to login
+    if (!user) return "/login"; 
 
-    switch (user.role) {
+    // Added optional chaining here just in case!
+    switch (user?.role) { 
       case 'ADMIN': 
         return "/AdminDashboard";
       case 'USER_MANAGER': 
-        return "/user-manager-dashboard";
+        return "/user-manager/dashboard";
       case 'VEHICLE_MANAGER': 
         return "/manager/fleet";
       default: 
-        return "/UserDashboard"; // Standard user
+        return "/UserDashboard"; 
     }
   };
 
@@ -36,7 +37,8 @@ export default function Home(): JSX.Element {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 mb-6">
             <Zap size={14} className="text-blue-400" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">
-              {user ? `Welcome back, ${user.role}` : 'Next-Gen Fleet Access'}
+              {/* THE FIX: Added optional chaining and fallback */}
+              {user ? `Welcome back, ${user?.role || ''}` : 'Next-Gen Fleet Access'}
             </span>
           </div>
 
@@ -45,15 +47,16 @@ export default function Home(): JSX.Element {
           </h1>
           
           <p className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto mb-10 font-medium leading-relaxed">
+            {/* THE FIX: Added optional chaining and fallback to prevent the .replace() crash */}
             {user 
-              ? `Identity confirmed. Ready to synchronize with the ${user.role.replace('_', ' ')} terminal.` 
+              ? `Identity confirmed. Ready to synchronize with the ${user?.role?.replace('_', ' ') || 'SYSTEM'} terminal.` 
               : "Instant access to a premium fleet of bikes and SUVs. No paperwork, no delays—just pure performance."
             }
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link 
-              to={dashboardPath} // 4. Dynamic Path
+              to={dashboardPath} 
               className="group px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3 shadow-[0_0_30px_rgba(37,99,235,0.3)]"
             >
               {user ? 'Enter Command Center' : 'Initiate Session'} 
@@ -89,7 +92,7 @@ export default function Home(): JSX.Element {
         </div>
       </div>
 
-      {/* 3. FEATURES GRID (Keep as is or update icons based on role) */}
+      {/* 3. FEATURES GRID */}
       <div className="max-w-7xl mx-auto py-16 px-6 grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
         <div className="group p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] hover:border-blue-500/30 transition-all duration-500 relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-blue-600/10 blur-3xl group-hover:bg-blue-600/20 transition-all" />

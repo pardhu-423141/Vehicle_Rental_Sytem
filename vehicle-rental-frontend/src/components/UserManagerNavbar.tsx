@@ -1,20 +1,35 @@
-import React, { Activity, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Users, ShieldCheck, Bell, UserCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Users, ShieldCheck, Bell, UserCircle, Activity, LogOut } from 'lucide-react'; // Added LogOut
+import { useAuth } from '../context/AuthContext'; // Adjust import path if needed
+import toast from 'react-hot-toast';
 
 export default function UserManagerNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false); // New state for profile menu
+  
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth(); // Get user and logout from context
 
-  // Navigation Links strictly for the User Manager workflow
- const navLinks = [
-    { name: 'Dashboard', path: '/user-manager/dashboard', icon: Activity }, // Add this!
+  // Handle Logout Action
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success("Logged out successfully");
+      navigate('/auth'); // Or '/login'
+    } catch (error) {
+      toast.error("Failed to logout");
+    }
+  };
+
+  const navLinks = [
+    { name: 'Dashboard', path: '/user-manager/dashboard', icon: Activity },
     { name: 'KYC Queue', path: '/user-manager/kyc', icon: ShieldCheck },
     { name: 'User Directory', path: '/user-manager/directory', icon: Users },
   ];
 
-  // Mock Notifications specific to Role 2.2 (User Manager)
   const userManagerNotifications = [
     { id: 1, title: 'New KYC Submission', message: 'Aditi Sharma uploaded Aadhaar and Driving License for review.', time: '2m ago', isRead: false, type: 'info' },
     { id: 2, title: 'System Flag', message: 'Kiran Kumar submitted a potentially blurry or invalid document. Manual check required.', time: '15m ago', isRead: false, type: 'warning' },
@@ -57,7 +72,6 @@ export default function UserManagerNavbar() {
 
           <div className="hidden md:flex items-center gap-4 relative">
             
-            {/* Notifications Bell Trigger */}
             <button 
               onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
               className="p-2 text-gray-400 hover:text-white transition relative"
@@ -68,7 +82,6 @@ export default function UserManagerNavbar() {
               )}
             </button>
 
-            {/* Notification Dropdown Panel */}
             {isNotificationsOpen && (
               <div className="absolute top-full mt-4 right-20 w-80 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
@@ -102,15 +115,39 @@ export default function UserManagerNavbar() {
               </div>
             )}
 
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10 ml-2">
-              <div className="text-right">
-                <p className="text-sm font-bold text-white leading-none">Priya T.</p>
-                <p className="text-[10px] text-purple-400 uppercase tracking-widest mt-1">User Mgr</p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                <UserCircle size={24} />
-              </div>
+            {/* --- UPDATED DYNAMIC PROFILE SECTION --- */}
+            <div className="relative flex items-center pl-4 border-l border-white/10 ml-2">
+              <button 
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="flex items-center gap-3 text-left focus:outline-none group"
+              >
+                <div className="text-right">
+                  <p className="text-sm font-bold text-white leading-none group-hover:text-purple-300 transition-colors">
+                    {user?.name || 'Manager'}
+                  </p>
+                  <p className="text-[10px] text-purple-400 uppercase tracking-widest mt-1">
+                    User Mgr
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/30 transition-all">
+                  <UserCircle size={24} />
+                </div>
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {isProfileOpen && (
+                <div className="absolute top-full right-0 mt-6 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2 transition-colors"
+                  >
+                    <LogOut size={16} /> Logout
+                  </button>
+                </div>
+              )}
             </div>
+            {/* -------------------------------------- */}
+
           </div>
 
           <div className="md:hidden">

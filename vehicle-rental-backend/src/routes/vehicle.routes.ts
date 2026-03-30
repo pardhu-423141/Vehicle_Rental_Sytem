@@ -1,27 +1,22 @@
 import { Router } from 'express';
-import { 
-  addVehicle, 
-  updateVehicle, 
-  removeVehicle, 
-  getVehicles, 
-  getVehicleById
-} from '../controllers/vehicle.controller';
 import { authenticate, authorize, isAdmin } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
+import { addVehicle, updateVehicle, removeVehicle, getVehicles, getVehicleById, getVehicleHistory } from '../controllers/vehicle.controller';
 
 const router = Router();
 
-// ANY logged-in user can see available vehicles
+// ANY logged-in user can see available vehicles (Filtered in controller)
 router.get('/', authenticate, getVehicles);
 
-// Only ADMIN or VEHICLE_MANAGER can add or update
+// 🚨 THE FIX: ONLY Admin can add vehicles now!
 router.post(
   '/add', 
   authenticate, 
-  authorize([Role.ADMIN, Role.VEHICLE_MANAGER]), 
+  authorize([Role.ADMIN]), // <-- Removed VEHICLE_MANAGER
   addVehicle
 );
 
+// Both can update, BUT we will add a security check in the controller!
 router.put(
   '/update/:id', 
   authenticate, 
@@ -29,8 +24,7 @@ router.put(
   updateVehicle
 );
 
-// Only ADMIN can remove (Soft Delete) as per your requirement
 router.delete('/remove/:id', authenticate, isAdmin, removeVehicle);
-
 router.get('/:id', authenticate, getVehicleById);
+router.get('/:id/history', authenticate, getVehicleHistory);
 export default router;

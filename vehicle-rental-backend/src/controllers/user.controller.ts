@@ -78,6 +78,7 @@ export const handleKYC = async (req: any, res: Response) => {
     res.status(500).json({ message: "Upload failed. Please try again." });
   }
 };
+
 // 1. See Profile & KYC Status
 export const getProfile = async (req: any, res: Response) => {
   const user = await db.user.findUnique({
@@ -85,10 +86,12 @@ export const getProfile = async (req: any, res: Response) => {
     include: { kycData: true },
   });
   if (!user) return res.status(404).json({ message: "User not found" });
+  
   const { password, ...safeUser } = user;
-  res.json(safeUser);
+  
+  // THE FIX: Wrap it in an object so the frontend can find 'res.data.user'
+  res.json({ user: safeUser }); 
 };
-
 // 2. Update Profile Name
 export const updateProfile = async (req: any, res: Response) => {
   const { name } = req.body;
