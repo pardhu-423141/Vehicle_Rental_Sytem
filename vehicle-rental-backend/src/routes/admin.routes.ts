@@ -8,13 +8,13 @@ import {
   restoreVehicle,     
   getAllBookings,
   getRevenueReports, 
-  getRecentTransactions    
+  getRecentTransactions  ,
+  getMaintenanceTasks, resolveMaintenance  
 } from '../controllers/admin.controller';
 
 import { getVehicles, addVehicle,removeVehicle,updateVehicle } from '../controllers/vehicle.controller';
 
 import { authenticate, isAdmin } from '../middleware/auth.middleware';
-import { getMaintenanceTasks, resolveMaintenance } from '../controllers/admin.controller';
 
 const router = Router();
 
