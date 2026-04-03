@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Trash2, Camera, Loader2, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  ShieldCheck, Trash2, Camera, Loader2, FileText, 
+  Clock, CheckCircle2, AlertTriangle 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../api/axios';          // <-- import your axios instance
+import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
 export default function UserKYC() {
-  const { user } = useAuth();            // only need user for status checks
+  const { user } = useAuth();
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Form states for new uploads
   const [formData, setFormData] = useState({
     idType: 'Driving License',
     idNumber: '',
@@ -19,10 +25,27 @@ export default function UserKYC() {
   });
   const [previews, setPreviews] = useState({ front: '', back: '' });
 
+  // 1. Fetch user profile to get the uploaded KYC images and exact status
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get('/user/profile');
+        // Handle nested data structures gracefully
+        setUserData(res.data?.user || res.data?.data || res.data);
+      } catch (err: any) {
+        console.error('Failed to fetch user data:', err);
+        toast.error('Could not load KYC status.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUserData();
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (file) {
-      // Optional: Validate file type and size
       if (!file.type.startsWith('image/')) {
         toast.error('Please select an image file.');
         return;
@@ -31,7 +54,6 @@ export default function UserKYC() {
         toast.error('File size must be less than 5MB.');
         return;
       }
-
       setFiles(prev => ({ ...prev, [side]: file }));
       setPreviews(prev => ({ ...prev, [side]: URL.createObjectURL(file) }));
     }
@@ -50,7 +72,6 @@ export default function UserKYC() {
       return;
     }
 
-    // Prepare FormData
     const data = new FormData();
     data.append('idType', formData.idType);
     data.append('idNumber', formData.idNumber);
@@ -60,16 +81,12 @@ export default function UserKYC() {
     setIsSubmitting(true);
 
     try {
-      // Send to your backend endpoint – adjust the URL as needed
       await api.post('/kyc/submit', data, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       toast.success('KYC documents submitted for review!');
-
-      // Optional: Reload the page to refresh user data (so KYC status updates)
-      // This avoids needing to modify the context or other files.
-      window.location.reload();
+      window.location.reload(); // Refresh to fetch the newly uploaded images
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Upload failed. Please try again.');
     } finally {
@@ -77,26 +94,114 @@ export default function UserKYC() {
     }
   };
 
-  // Render based on KYC status
-  if (user?.kycStatus === 'PENDING') return <PendingUI />;
-  if (user?.kycStatus === 'APPROVED') return <ApprovedUI />;
+  // Helper to construct image URLs if backend sends relative paths
+  const getImageUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    return `http://localhost:5000${path.startsWith('/') ? '' : '/'}${path}`;
+  };
 
+  if (loading) {
+    return (
+      <div className="w-full h-[60vh] flex flex-col items-center justify-center">
+        <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
+        <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">Loading Status...</p>
+      </div>
+    );
+  }
+
+  const kycStatus = userData?.kycStatus?.toUpperCase() || 'INCOMPLETE';
+  const kycData = userData?.kycData;
+
+  // 2. Render Submitted Documents (For Pending & Approved)
+  if ((kycStatus === 'PENDING' || kycStatus === 'APPROVED') && kycData) {
+    return (
+      <div className="max-w-4xl mx-auto p-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        
+        {/* Dynamic Header based on Status */}
+        {kycStatus === 'APPROVED' ? (
+          <div className="mb-8 p-6 bg-green-500/10 border border-green-500/20 rounded-3xl flex items-center gap-4">
+            <div className="p-4 bg-green-500/20 rounded-full text-green-400 shrink-0">
+              <CheckCircle2 size={32} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Identity Verified</h1>
+              <p className="text-gray-400 mt-1">Your documents have been approved. You are ready to ride.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-8 p-6 bg-yellow-500/10 border border-yellow-500/20 rounded-3xl flex items-center gap-4">
+            <div className="p-4 bg-yellow-500/20 rounded-full text-yellow-400 shrink-0">
+              <Clock size={32} className="animate-pulse" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Verification in Progress</h1>
+              <p className="text-gray-400 mt-1">Your submitted documents are currently under review by our managers.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Read-Only Document Viewer */}
+        <div className="bg-white/5 border border-white/10 p-8 rounded-3xl space-y-6">
+          <h2 className="text-lg font-bold text-white border-b border-white/10 pb-4">Submitted Details</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-black/20 p-6 rounded-2xl border border-white/5">
+            <div>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Document Type</p>
+              <p className="text-white font-medium">{kycData.idType}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Document Number</p>
+              <p className="text-white font-mono">{kycData.idNumber}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+            <div className="space-y-2">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest ml-1">Front Side</p>
+              <div className="aspect-video bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-inner">
+                <img src={getImageUrl(kycData.idImageFront)} alt="ID Front" className="w-full h-full object-cover" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest ml-1">Back Side</p>
+              <div className="aspect-video bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-inner">
+                <img src={getImageUrl(kycData.idImageBack)} alt="ID Back" className="w-full h-full object-cover" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Render Upload Form (For Incomplete or Rejected)
   return (
     <div className="max-w-4xl mx-auto p-6 animate-in fade-in duration-700">
+      
+      {kycStatus === 'REJECTED' && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3">
+          <AlertTriangle className="text-red-400 shrink-0" size={24} />
+          <p className="text-sm text-red-200">
+            <strong>Your previous submission was rejected.</strong> Please ensure the images are clear, well-lit, and match the entered ID number.
+          </p>
+        </div>
+      )}
+
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-white mb-2">Identity Verification</h1>
-        <p className="text-gray-400">Upload your government-issued ID to start renting.</p>
+        <p className="text-gray-400">Upload your government-issued ID to unlock vehicle bookings.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white/5 border border-white/10 p-6 rounded-3xl space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white/5 border border-white/10 p-6 md:p-8 rounded-3xl space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest ml-1">ID Type</label>
               <select
                 value={formData.idType}
                 onChange={(e) => setFormData({ ...formData, idType: e.target.value })}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition"
+                className="w-full mt-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-white outline-none focus:border-blue-500 transition shadow-inner"
               >
                 <option value="Driving License">Driving License</option>
                 <option value="Aadhaar">Aadhaar Card</option>
@@ -110,29 +215,25 @@ export default function UserKYC() {
                 placeholder="Ex: DL-123456789"
                 value={formData.idNumber}
                 onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition"
+                className="w-full mt-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition shadow-inner"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-            {/* Front Upload */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
             <UploadBox
               label="Front Side"
               preview={previews.front}
-              onFileChange={(e) => handleFileChange(e, 'front')}
+              onFileChange={(e: React.ChangeEvent<HTMLInputElement, Element>) => handleFileChange(e, 'front')}
               onRemove={() => removeFile('front')}
               icon={<FileText size={20} />}
-              isUploading={false} // No per‑side loading indicator needed because we use one submit button
             />
-            {/* Back Upload */}
             <UploadBox
               label="Back Side"
               preview={previews.back}
-              onFileChange={(e) => handleFileChange(e, 'back')}
+              onFileChange={(e: React.ChangeEvent<HTMLInputElement, Element>) => handleFileChange(e, 'back')}
               onRemove={() => removeFile('back')}
               icon={<Camera size={20} />}
-              isUploading={false}
             />
           </div>
         </div>
@@ -140,7 +241,7 @@ export default function UserKYC() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+          className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-lg shadow-blue-900/40"
         >
           {isSubmitting ? <Loader2 className="animate-spin" /> : <ShieldCheck size={20} />}
           {isSubmitting ? 'Uploading Documents...' : 'Submit for Verification'}
@@ -150,72 +251,33 @@ export default function UserKYC() {
   );
 }
 
-// Upload box component (unchanged except for optional loading state)
-function UploadBox({
-  label,
-  preview,
-  onFileChange,
-  onRemove,
-  icon,
-  isUploading,
-}: {
-  label: string;
-  preview: string;
-  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemove: () => void;
-  icon: React.ReactNode;
-  isUploading: boolean;
-}) {
+// Upload box component
+function UploadBox({ label, preview, onFileChange, onRemove, icon }: any) {
   return (
     <div className="space-y-2">
       <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest ml-1">{label}</p>
-      <div className="relative aspect-video bg-black/40 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center overflow-hidden group">
+      <div className="relative aspect-video bg-black/40 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center overflow-hidden group hover:border-blue-500/50 transition-colors">
         {preview ? (
           <>
             <img src={preview} className="w-full h-full object-cover" alt="Preview" />
             <button
               type="button"
               onClick={onRemove}
-              className="absolute top-2 right-2 p-2 bg-red-500 rounded-lg text-white opacity-0 group-hover:opacity-100 transition"
+              className="absolute top-3 right-3 p-2 bg-red-500 rounded-lg text-white opacity-0 group-hover:opacity-100 transition shadow-lg"
             >
-              <Trash2 size={14} />
+              <Trash2 size={16} />
             </button>
           </>
-        ) : isUploading ? (
-          <div className="flex flex-col items-center">
-            <Loader2 className="animate-spin text-blue-500 mb-2" size={32} />
-            <span className="text-xs text-gray-400">Uploading...</span>
-          </div>
         ) : (
-          <label className="cursor-pointer flex flex-col items-center p-6 text-center">
-            <div className="p-3 bg-white/5 rounded-full text-gray-500 mb-2 group-hover:text-blue-500 transition-colors">
+          <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-6 text-center">
+            <div className="p-4 bg-white/5 rounded-full text-gray-400 mb-3 group-hover:text-blue-400 group-hover:bg-blue-500/10 transition-all">
               {icon}
             </div>
-            <span className="text-xs text-gray-500 font-bold">Click to Upload</span>
+            <span className="text-xs text-gray-400 font-bold">Click to Browse</span>
             <input type="file" hidden accept="image/*" onChange={onFileChange} />
           </label>
         )}
       </div>
-    </div>
-  );
-}
-
-function PendingUI() {
-  return (
-    <div className="text-center py-20 bg-white/5 border border-white/10 rounded-3xl">
-      <Loader2 className="animate-spin text-yellow-500 mx-auto mb-4" size={48} />
-      <h2 className="text-xl font-bold text-white">Verification in Progress</h2>
-      <p className="text-gray-400 mt-2">Our managers are reviewing your documents. Check back in 2-4 hours.</p>
-    </div>
-  );
-}
-
-function ApprovedUI() {
-  return (
-    <div className="text-center py-20 bg-green-500/10 border border-green-500/20 rounded-3xl">
-      <ShieldCheck className="text-green-500 mx-auto mb-4" size={48} />
-      <h2 className="text-xl font-bold text-white">Verified Account</h2>
-      <p className="text-gray-400 mt-2">You're all set! You can now book any vehicle in the fleet.</p>
     </div>
   );
 }
