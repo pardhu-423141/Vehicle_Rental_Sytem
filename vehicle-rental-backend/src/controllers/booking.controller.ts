@@ -121,3 +121,56 @@ export const getBookingHistory = async (req: any, res: Response) => {
     res.status(500).json({ message: "Failed to fetch booking history" });
   }
 };
+// 4. COMPLETE BOOKING (End of Ride)
+export const completeBooking = async (req: any, res: Response) => {
+  const { id } = req.params; // The Booking ID
+  const { issueReported } = req.body; // Optional: Did the user report a broken mirror, flat tire, etc.?
+
+  try {
+    // 1. Find the booking to get the vehicleId
+    const booking = await db.booking.findUnique({
+      where: { id }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+
+    // 2. Mark the booking as COMPLETED
+    await db.booking.update({
+      where: { id },
+      data: { status: 'COMPLETED' }
+    });
+
+    // 3. Determine the vehicle's next status
+    if (issueReported) {
+      // If the car needs fixing, take it off the market and create a Maintenance Task
+      await db.vehicle.update({
+        where: { id: booking.vehicleId },
+        data: { status: 'under maintenance' }
+      });
+
+      await db.maintenanceTask.create({
+        data: {
+          vehicleId: booking.vehicleId,
+          issue: issueReported,
+          status: 'Pending'
+        }
+      });
+      
+      return res.status(200).json({ message: "Ride completed. Vehicle flagged for maintenance." });
+    } else {
+      // If the car is fine, put it back on the market for the next user
+      await db.vehicle.update({
+        where: { id: booking.vehicleId },
+        data: { status: 'Available' }
+      });
+      
+      return res.status(200).json({ message: "Ride completed successfully. Vehicle is available." });
+    }
+
+  } catch (error) {
+    console.error("Completion Error:", error);
+    res.status(500).json({ message: "Failed to complete the ride." });
+  }
+};
