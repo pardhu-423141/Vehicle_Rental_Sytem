@@ -63,7 +63,7 @@ export const createBooking = async (req: any, res: Response) => {
         startDate: start,
         endDate: end,
         totalPrice,
-        status: 'PENDING',
+        status: 'CONFIRMED' // Initial status,
       },
     });
 

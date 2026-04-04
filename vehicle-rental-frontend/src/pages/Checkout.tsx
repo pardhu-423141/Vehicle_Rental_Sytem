@@ -5,6 +5,14 @@ import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+
+interface BookingRange {
+  startDate: string;
+  endDate: string;
+}
+
 interface Vehicle {
   id: string;
   make: string;
@@ -19,24 +27,26 @@ interface Vehicle {
   type: string;
   seatingCapacity: number;
   status: string;
+  bookings?: BookingRange[];
 }
 
 export default function Checkout() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pickupDate, setPickupDate] = useState('');
-  const [dropoffDate, setDropoffDate] = useState('');
+  
+  const [pickupDate, setPickupDate] = useState<Date | null>(null);
+  const [dropoffDate, setDropoffDate] = useState<Date | null>(null);
   const [totalDays, setTotalDays] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   const kycStatus = user?.kycStatus || null;
   const isKycApproved = kycStatus === 'APPROVED';
 
-  // Fetch vehicle details
   useEffect(() => {
     const fetchVehicle = async () => {
       if (!id) return;
@@ -55,7 +65,6 @@ export default function Checkout() {
     fetchVehicle();
   }, [id]);
 
-  // Redirect if not logged in or KYC not approved
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
@@ -68,11 +77,10 @@ export default function Checkout() {
     }
   }, [authLoading, user, isKycApproved, navigate]);
 
-  // Calculate total days
   useEffect(() => {
     if (pickupDate && dropoffDate) {
-      const start = new Date(pickupDate).getTime();
-      const end = new Date(dropoffDate).getTime();
+      const start = pickupDate.getTime();
+      const end = dropoffDate.getTime();
       if (end > start) {
         const diffMs = end - start;
         const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -84,6 +92,22 @@ export default function Checkout() {
       setTotalDays(0);
     }
   }, [pickupDate, dropoffDate]);
+
+  // ⚡ Foolproof method to block dates accurately
+  const isDateAvailable = (date: Date) => {
+    if (!vehicle?.bookings || vehicle.bookings.length === 0) return true;
+
+    return !vehicle.bookings.some(booking => {
+      const start = new Date(booking.startDate);
+      const end = new Date(booking.endDate);
+      
+      // Strip time to exactly midnight so calendar comparison works flawlessly
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999); 
+
+      return date >= start && date <= end;
+    });
+  };
 
   const baseCost = vehicle ? totalDays * vehicle.rentalRate : 0;
   const taxes = Math.round(baseCost * 0.18);
@@ -102,73 +126,47 @@ export default function Checkout() {
 
     setSubmitting(true);
     try {
-      const startISO = new Date(pickupDate).toISOString();
-      const endISO = new Date(dropoffDate).toISOString();
       await api.post('/bookings/', {
         vehicleId: id,
-        startDate: startISO,
-        endDate: endISO,
+        startDate: pickupDate.toISOString(),
+        endDate: dropoffDate.toISOString(),
       });
       toast.success('Booking confirmed! Vehicle manager has been notified.');
       setTimeout(() => navigate('/Userdashboard'), 2000);
     } catch (err: any) {
       console.error('Booking failed:', err);
-      const msg = err.response?.data?.message || 'Booking failed. Please try again.';
-      toast.error(msg);
+      toast.error(err.response?.data?.message || 'Booking failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (authLoading || loading) {
-    return (
-      <div className="w-full flex justify-center items-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-blue-500" size={48} />
-      </div>
-    );
-  }
-
-  if (error || !vehicle) {
-    return (
-      <div className="w-full max-w-6xl px-4 text-center py-20">
-        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8">
-          <ShieldAlert className="text-red-500 mx-auto mb-4" size={48} />
-          <h2 className="text-2xl font-bold text-white mb-2">Vehicle Unavailable</h2>
-          <p className="text-gray-400">{error || 'Vehicle not found.'}</p>
-          <Link to="/marketplace" className="mt-6 inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-            Browse Vehicles
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isKycApproved) {
-    return (
-      <div className="w-full max-w-6xl px-4 text-center py-20">
-        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-8">
-          <ShieldAlert className="text-yellow-500 mx-auto mb-4" size={48} />
-          <h2 className="text-2xl font-bold text-white mb-2">KYC Required</h2>
-          <p className="text-gray-400">You need to complete KYC verification before booking a vehicle.</p>
-          <Link to="/kyc" className="mt-6 inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-            Complete KYC
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const vehicleName = `${vehicle.make} ${vehicle.model}`;
+  if (authLoading || loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" size={48} /></div>;
+  if (error || !vehicle) return <div className="text-center text-white py-20">Vehicle not found.</div>;
+  if (!isKycApproved) return <div className="text-center text-white py-20">KYC Required.</div>;
 
   return (
     <div className="w-full max-w-6xl px-4 animate-in fade-in duration-700">
+      {/* ⚡ Injecting Global CSS to force time column side-by-side */}
+      <style>{`
+        .react-datepicker {
+          display: flex !important;
+          flex-direction: row !important;
+        }
+        .react-datepicker__time-container {
+          border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+        .react-datepicker-popper {
+          z-index: 50 !important;
+        }
+      `}</style>
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white tracking-tight">Complete your Booking</h1>
         <p className="text-gray-400 mt-2">Step 4: Select your duration and confirm.</p>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Left Column: Form Details */}
         <div className="flex-1 space-y-6">
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
@@ -177,30 +175,43 @@ export default function Checkout() {
 
             <form className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
+                
+                <div className="space-y-2 flex flex-col">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Pick-up Date & Time</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                    <input
-                      type="datetime-local"
-                      value={pickupDate}
-                      onChange={(e) => setPickupDate(e.target.value)}
+                  <div className="relative w-full">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 z-10" size={18} />
+                    <DatePicker
+                      selected={pickupDate}
+                      onChange={(date) => setPickupDate(date)}
+                      showTimeSelect
+                      dateFormat="MMMM d, yyyy h:mm aa"
+                      minDate={new Date()} 
+                      filterDate={isDateAvailable} // ⚡ Ensures dates are blocked
+                      placeholderText="Select pickup time"
                       className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition [color-scheme:dark]"
+                      wrapperClassName="w-full"
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
+
+                <div className="space-y-2 flex flex-col">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Drop-off Date & Time</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                    <input
-                      type="datetime-local"
-                      value={dropoffDate}
-                      onChange={(e) => setDropoffDate(e.target.value)}
+                  <div className="relative w-full">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 z-10" size={18} />
+                    <DatePicker
+                      selected={dropoffDate}
+                      onChange={(date) => setDropoffDate(date)}
+                      showTimeSelect
+                      dateFormat="MMMM d, yyyy h:mm aa"
+                      minDate={pickupDate || new Date()} 
+                      filterDate={isDateAvailable} // ⚡ Ensures dates are blocked
+                      placeholderText="Select dropoff time"
                       className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition [color-scheme:dark]"
+                      wrapperClassName="w-full"
                     />
                   </div>
                 </div>
+
               </div>
             </form>
           </div>
@@ -214,52 +225,21 @@ export default function Checkout() {
           </div>
         </div>
 
-        {/* Right Column: Order Summary */}
         <div className="w-full lg:w-[400px]">
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl sticky top-24">
             <h2 className="text-xl font-bold text-white mb-6">Booking Summary</h2>
-
-            <div className="flex gap-4 mb-6 pb-6 border-b border-white/10">
-              <div className="w-24 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-800">
-                {vehicle.imageUrl ? (
-                  <img src={vehicle.imageUrl} alt={vehicleName} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">No image</div>
-                )}
-              </div>
-              <div>
-                <h3 className="font-bold text-white leading-tight">{vehicleName}</h3>
-                <p className="text-xs text-gray-400 mt-1">
-                  {vehicle.type} • {vehicle.year} • {vehicle.color}
-                </p>
-              </div>
-            </div>
-
             <div className="space-y-4 mb-6 pb-6 border-b border-white/10 text-sm">
-              <div className="flex justify-between text-gray-300">
-                <span>Rate per day</span>
-                <span className="flex items-center"><IndianRupee size={12}/>{vehicle.rentalRate}</span>
-              </div>
               <div className="flex justify-between text-gray-300">
                 <span>Number of days</span>
                 <span>{totalDays}</span>
               </div>
-              <div className="flex justify-between text-gray-300">
-                <span>Base cost</span>
-                <span className="flex items-center"><IndianRupee size={12}/>{baseCost}</span>
-              </div>
-              <div className="flex justify-between text-gray-300">
-                <span>Taxes (18%)</span>
-                <span className="flex items-center"><IndianRupee size={12}/>{taxes}</span>
-              </div>
-              <div className="flex justify-between text-white font-medium mt-2 pt-2">
+              <div className="flex justify-between text-white font-medium mt-2 pt-2 border-t border-white/10">
                 <span>Total Amount</span>
                 <span className="flex items-center text-xl text-blue-400 font-bold">
                   <IndianRupee size={18}/>{totalDays > 0 ? finalTotal : '0'}
                 </span>
               </div>
             </div>
-
             <button
               onClick={handleConfirmBooking}
               disabled={totalDays <= 0 || submitting}
@@ -269,11 +249,7 @@ export default function Checkout() {
                   : 'bg-white/10 text-gray-500 cursor-not-allowed border border-white/5'
               }`}
             >
-              {submitting ? (
-                <Loader2 className="animate-spin" size={20} />
-              ) : (
-                <CheckCircle2 size={20} />
-              )}
+              {submitting ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
               {submitting ? 'Processing...' : 'Confirm & Pay'}
             </button>
           </div>
