@@ -17,7 +17,7 @@ import operationsRoutes from './routes/operationsRoutes'; // ✅ Imported perfec
 // 2. Import Database Connection and Cron Tasks
 import './config/db';   // Ensures DB connection is tested on startup
 import './config/cron'; // Starts the 6-month auto-delete background task
-
+import staffRoutes from './routes/staff.routes';
 const app = express();
 
 // 3. Middlewares
@@ -65,3 +65,5 @@ app.listen(PORT, () => {
   📅 Cron tasks initialized
   `);
 });
+
+app.use('/api/admin/staff', staffRoutes);

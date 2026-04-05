@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Mail, Shield, Wrench, UserCog, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../api/axios'; // ⚡ Ensure this points to your custom axios instance
+import axios from 'axios';
 import AddStaffModal from '../components/AddStaffModal';
 
 interface StaffMember {
@@ -18,38 +18,29 @@ export default function StaffManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // const [viewMode, setViewMode] = useState<'grid' | 'list'>('list'); // Retained if you plan to use it later
 
-  // 1. Fetch Real Staff from Database
   const fetchStaff = async () => {
     try {
       setLoading(true);
-      // ⚡ Update this endpoint if your backend route differs
-      const { data } = await api.get('/admin/staff');
+      
+      // ⚡ FIX: Grab the token from localStorage
+      const token = localStorage.getItem('token');
+      
+      const { data } = await axios.get('http://localhost:5000/api/admin/staff', {
+        headers: {
+          Authorization: `Bearer ${token}` 
+        },
+        withCredentials: true
+      });
 
-      // ⚡ BULLETPROOF EXTRACTION: Check all common backend response structures
       let staffArray: any[] = [];
-      if (Array.isArray(data)) {
-        staffArray = data;
-      } else if (data && Array.isArray(data.data)) {
-        staffArray = data.data;
-      } else if (data && Array.isArray(data.staff)) {
-        staffArray = data.staff;
-      } else if (data?.data && Array.isArray(data.data.staff)) {
-        staffArray = data.data.staff;
-      }
+      if (Array.isArray(data)) staffArray = data;
+      else if (data && Array.isArray(data.data)) staffArray = data.data;
+      else if (data && Array.isArray(data.staff)) staffArray = data.staff;
 
-      // Map backend data to our frontend interface
       const mappedStaff: StaffMember[] = staffArray.map((s: any) => {
-        // Handle Role Enums (e.g., USER_MANAGER -> User Manager)
         const rawRole = (s.role || '').toUpperCase();
         const role = rawRole.includes('USER') ? 'User Manager' : 'Vehicle Manager';
-
-        // Handle Status Enums
-        const rawStatus = (s.status || 'ACTIVE').toUpperCase();
-        let status: 'Active' | 'On Leave' | 'Inactive' = 'Active';
-        if (rawStatus === 'ON_LEAVE' || rawStatus === 'LEAVE') status = 'On Leave';
-        if (rawStatus === 'INACTIVE') status = 'Inactive';
 
         return {
           id: s._id || s.id,
@@ -57,7 +48,7 @@ export default function StaffManagement() {
           email: s.email || 'N/A',
           role: role,
           assignedTasks: s.assignedTasks || s.tasks || 0,
-          status: status
+          status: 'Active'
         };
       });
 
@@ -75,13 +66,11 @@ export default function StaffManagement() {
     fetchStaff();
   }, []);
 
-  // Filter staff based on search input securely
   const filteredStaff = staff.filter(member => 
     member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     member.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Loading UI State
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-white">
@@ -94,7 +83,6 @@ export default function StaffManagement() {
   return (
     <div className="w-full max-w-7xl px-4 animate-in fade-in duration-700">
       
-      {/* 1. Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
         <div>
           <h1 className="text-4xl font-bold text-white tracking-tight">Staff Management</h1>
@@ -111,7 +99,6 @@ export default function StaffManagement() {
         </div>
       </div>
 
-      {/* 2. Search Toolbar */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -125,7 +112,6 @@ export default function StaffManagement() {
         </div>
       </div>
 
-      {/* 3. Staff Directory Table */}
       <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl overflow-hidden mb-10">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left">
@@ -155,7 +141,6 @@ export default function StaffManagement() {
                     </div>
                   </td>
 
-                  {/* Role Badges */}
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-2">
                       {staffMember.role === 'User Manager' ? (
@@ -172,7 +157,6 @@ export default function StaffManagement() {
                     </div>
                   </td>
 
-                  {/* Workload Metric */}
                   <td className="px-6 py-5">
                     <div className="flex flex-col gap-1.5">
                       <div className="flex justify-between text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
@@ -189,11 +173,7 @@ export default function StaffManagement() {
                   </td>
 
                   <td className="px-6 py-5 text-center">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border backdrop-blur-md ${
-                      staffMember.status === 'Active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                      staffMember.status === 'On Leave' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                      'bg-red-500/20 text-red-400 border-red-500/30'
-                    }`}>
+                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border backdrop-blur-md bg-green-500/20 text-green-400 border-green-500/30">
                       {staffMember.status}
                     </span>
                   </td>
@@ -205,44 +185,15 @@ export default function StaffManagement() {
                   </td>
                 </tr>
               ))}
-
-              {/* Empty State */}
-              {filteredStaff.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
-                    No staff members found matching your search criteria.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* 4. Role Assignment Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-        <div className="p-6 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
-          <div className="flex items-center gap-3 mb-4">
-             <div className="p-2 bg-purple-500/20 rounded-lg"><Shield className="text-purple-400" size={20}/></div>
-             <h4 className="text-white font-bold">User Management</h4>
-          </div>
-          <p className="text-sm text-gray-400 leading-relaxed">Verifies customer KYC documents including Aadhaar and Driving Licenses to ensure booking security.</p>
-        </div>
-        <div className="p-6 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
-          <div className="flex items-center gap-3 mb-4">
-             <div className="p-2 bg-orange-500/20 rounded-lg"><Wrench className="text-orange-400" size={20}/></div>
-             <h4 className="text-white font-bold">Fleet Operations</h4>
-          </div>
-          <p className="text-sm text-gray-400 leading-relaxed">Handles vehicle handover, return inspections, and maintenance tracking for assigned vehicles.</p>
-        </div>
-      </div>
-
-      {/* Add Staff Modal Component */}
       <AddStaffModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
-        /* If your modal takes a success callback to refresh the list, pass it here: */
-        /* onSuccess={() => fetchStaff()} */
+        onSuccess={() => fetchStaff()} 
       />
     </div>
   );
