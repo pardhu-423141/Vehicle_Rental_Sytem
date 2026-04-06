@@ -23,14 +23,14 @@ export default function UserDashboard() {
         
         const [profileRes, bookingsRes] = await Promise.all([
           axios.get(`http://localhost:5000/api/user/profile`, { withCredentials: true }),
-          axios.get(`http://localhost:5000/api/bookings`, { withCredentials: true }).catch(() => ({ data: [] }))
+          axios.get(`http://localhost:5000/api/bookings/my-bookings`, { withCredentials: true }).catch(() => ({ data: [] }))
         ]);
         
         setUserData(profileRes.data);
 
         // ⚡ EXACT SCHEMA MATCH: Filter for rides using your specific Prisma Enum
         const allBookings = bookingsRes.data || [];
-        const activeStatuses = ['PENDING', 'CONFIRMED', 'ONGOING']; // <-- Updated here!
+        const activeStatuses = ['PENDING', 'CONFIRMED', 'ONGOING']; 
         
         const currentRides = allBookings.filter((booking: any) => 
           activeStatuses.includes(booking.status?.toUpperCase())
@@ -114,15 +114,14 @@ export default function UserDashboard() {
     }
   };
 
-  // Helper to style the booking status badge based on your exact enum
   const getRideStatusStyle = (status: string) => {
     switch (status?.toUpperCase()) {
       case 'ONGOING':
-        return 'bg-green-500/10 text-green-400 border-green-500/20'; // Green for active driving
+        return 'bg-green-500/10 text-green-400 border-green-500/30 text-green-400'; 
       case 'CONFIRMED':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/20'; // Blue for approved/waiting
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/30 text-blue-400'; 
       default: // PENDING
-        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'; // Yellow for awaiting manager
+        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 text-yellow-400'; 
     }
   };
 
@@ -142,7 +141,7 @@ export default function UserDashboard() {
       
       <div className="mb-10">
         <h1 className="text-4xl font-black text-white tracking-tighter">
-            Welcome, <span className="text-blue-400">{actualUser?.name || 'Operator'}</span>
+            Welcome, <span className="text-blue-400">{actualUser?.name || 'Explorer'}</span>
         </h1>
         <p className="text-gray-400 mt-2 text-sm font-medium">Manage your fleet access and tracking stats.</p>
       </div>
@@ -182,21 +181,30 @@ export default function UserDashboard() {
       {activeRides.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {activeRides.map((ride) => (
-            <div key={ride.id} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-blue-500/40 transition-colors">
-              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                <Car size={100} />
+            <div key={ride.id} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-xl relative overflow-hidden group hover:border-blue-500/40 transition-colors flex flex-col">
+              
+              {/* ⚡ THE CAR IMAGE HEADER */}
+              <div className="w-full h-48 rounded-2xl overflow-hidden mb-5 relative bg-black/40 shrink-0">
+                <img 
+                  src={ride.vehicle?.image || ride.vehicle?.imageUrl || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf'} 
+                  alt={ride.vehicle?.name || `${ride.vehicle?.make} ${ride.vehicle?.model}`} 
+                  className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
+                />
+                <div className="absolute top-3 left-3">
+                  <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border backdrop-blur-md flex items-center gap-1.5 ${getRideStatusStyle(ride.status)}`}>
+                    {ride.status === 'ONGOING' && <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />}
+                    {ride.status}
+                  </span>
+                </div>
               </div>
               
-              <div className="relative z-10">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    {/* ⚡ Status Badge using specific enum colors */}
-                    <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${getRideStatusStyle(ride.status)}`}>
-                      {ride.status}
-                    </span>
-                    <h3 className="text-xl font-bold text-white mt-3 truncate">{ride.vehicle?.make} {ride.vehicle?.model}</h3>
-                    <p className="text-sm font-mono text-gray-400 mt-1">{ride.vehicle?.licensePlate || 'Plate Unassigned'}</p>
-                  </div>
+              <div className="relative z-10 flex-1 flex flex-col px-1">
+                {/* ⚡ CAR NAME AND PLATE */}
+                <div>
+                  <h3 className="text-2xl font-bold text-white truncate">
+                    {ride.vehicle?.name || `${ride.vehicle?.make} ${ride.vehicle?.model}`}
+                  </h3>
+                  <p className="text-sm font-mono text-gray-400 mt-1">{ride.vehicle?.licensePlate || 'Plate Unassigned'}</p>
                 </div>
 
                 <div className="space-y-3 mt-6">
@@ -210,7 +218,7 @@ export default function UserDashboard() {
                   </div>
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-between">
+                <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between">
                   <span className="text-[10px] text-gray-500 font-mono" title={ride.id}>
                     ID: {ride.id.split('-')[0].toUpperCase()}
                   </span>
@@ -223,22 +231,46 @@ export default function UserDashboard() {
           ))}
         </div>
       ) : (
-        <div className="bg-white/5 border border-dashed border-white/10 rounded-[2.5rem] p-16 flex flex-col items-center justify-center text-center">
-          <div className="p-6 rounded-full bg-white/5 mb-6">
-              <Car size={48} className="text-gray-700" />
-          </div>
-          <h4 className="text-xl font-bold text-white mb-2 tracking-tight">No Active Deployments</h4>
-          <p className="text-gray-400 mb-8 max-w-xs text-sm">Your fleet is currently docked. Visit the marketplace to commission a vehicle.</p>
+        /* ⚡ NEW SLEEK EMPTY STATE WITH IMAGE */
+        <div className="bg-gradient-to-b from-white/5 to-transparent border border-white/10 rounded-[2.5rem] p-8 md:p-16 flex flex-col items-center justify-center text-center relative overflow-hidden group shadow-2xl">
           
-          {actualUser?.kycStatus?.toUpperCase() === 'APPROVED' ? (
-            <Link to="/marketplace" className="px-8 py-4 bg-white/5 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-white/10 transition border border-white/10 shadow-xl">
-              Browse Marketplace
-            </Link>
-          ) : (
-            <Link to="/kyc" className="px-8 py-4 bg-white/5 text-gray-400 text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-white/10 transition border border-white/10 shadow-xl opacity-75">
-              Complete KYC to Browse
-            </Link>
-          )}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-lg opacity-20 pointer-events-none">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-blue-500/30 blur-[100px] rounded-full" />
+          </div>
+
+          <div className="relative z-10 flex flex-col items-center">
+            
+            {/* Visual Header Image */}
+            <div className="w-56 h-36 mb-8 relative rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+              <img
+                src="https://images.unsplash.com/photo-1503376712341-a6fa46c4f51e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                alt="Luxury Car"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0f1115] via-transparent to-transparent" />
+            </div>
+
+            <h4 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">Ready for your next adventure?</h4>
+            <p className="text-gray-400 mb-10 max-w-md text-sm leading-relaxed">
+              You don't have any upcoming or active trips. Browse our premium fleet and book the perfect vehicle for your journey today.
+            </p>
+            
+            {actualUser?.kycStatus?.toUpperCase() === 'APPROVED' ? (
+              <Link 
+                to="/marketplace" 
+                className="px-8 py-4 bg-blue-600 text-white text-sm font-bold rounded-2xl hover:bg-blue-700 transition shadow-lg shadow-blue-900/30 flex items-center gap-2 transform active:scale-95"
+              >
+                Book Your Ride <ArrowRight size={18} />
+              </Link>
+            ) : (
+              <Link 
+                to="/kyc" 
+                className="px-8 py-4 bg-orange-600/20 text-orange-400 border border-orange-500/30 text-sm font-bold rounded-2xl hover:bg-orange-600/30 transition flex items-center gap-2 transform active:scale-95"
+              >
+                <ShieldAlert size={18} /> Complete KYC to Book
+              </Link>
+            )}
+          </div>
         </div>
       )}
 

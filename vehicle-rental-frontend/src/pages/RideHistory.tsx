@@ -23,7 +23,7 @@ interface Booking {
     image: string;
     managerName?: string;
   };
-  review?: { id: string }; // ⚡ Tells TypeScript a review might be attached
+  review?: { id: string }; 
 }
 
 export default function RideHistory() {
@@ -46,6 +46,7 @@ export default function RideHistory() {
       setLoading(true);
       const response = await api.get('/bookings/my-bookings');
       setBookings(response.data);
+      
     } catch (error) {
       console.error("Error fetching bookings:", error);
       toast.error("Failed to load your trips.");
@@ -94,7 +95,6 @@ export default function RideHistory() {
       
       toast.success("Review submitted successfully! Thank you.");
       
-      // ⚡ Instantly update the UI to hide the review button
       setBookings(prevBookings => 
         prevBookings.map(b => 
           b.id === reviewBooking.id ? { ...b, review: { id: 'new' } } : b
@@ -117,6 +117,13 @@ export default function RideHistory() {
     if (filter === 'Completed') return ride.status === 'COMPLETED';
     return true;
   });
+
+  // ⚡ Helper function to calculate duration
+  const calculateDays = (start: string, end: string) => {
+    const diffTime = Math.abs(new Date(end).getTime() - new Date(start).getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
+    return `${diffDays} Day${diffDays > 1 ? 's' : ''}`;
+  };
 
   if (loading) {
     return (
@@ -177,11 +184,21 @@ export default function RideHistory() {
                 <div className="flex-1 flex flex-col justify-between py-2">
                   <div>
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-2 mb-4">
+                      
+                      {/* ⚡ UPDATED: Removed Booking ID, added Vehicle Type and Trip Duration */}
                       <div>
                         <h3 className="text-2xl font-bold text-white leading-tight">{ride.vehicle.name}</h3>
-                        <p className="text-xs text-gray-400 font-mono mt-1" title={ride.id}>Booking ID: {ride.id.slice(0, 8).toUpperCase()}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-[10px] bg-white/10 border border-white/10 text-gray-300 px-2 py-0.5 rounded-md uppercase tracking-widest font-bold">
+                            {ride.vehicle.type ? ride.vehicle.type.replace('_', ' ') : 'Standard'}
+                          </span>
+                          <span className="text-xs text-gray-400 font-medium">
+                            • {calculateDays(ride.startDate, ride.endDate)} Trip
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-left md:text-right">
+
+                      <div className="text-left md:text-right mt-2 md:mt-0">
                         <p className="text-xl font-bold text-white flex items-center md:justify-end">
                           <IndianRupee size={18} />{ride.totalPrice}
                         </p>
@@ -194,14 +211,14 @@ export default function RideHistory() {
                         <div className="p-2 bg-white/5 rounded-lg text-gray-400"><Calendar size={16} /></div>
                         <div>
                           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-0.5">Pick-up</p>
-                          <p className="text-sm text-gray-200">{new Date(ride.startDate).toLocaleString()}</p>
+                          <p className="text-sm text-gray-200">{new Date(ride.startDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
                         <div className="p-2 bg-white/5 rounded-lg text-gray-400"><Clock size={16} /></div>
                         <div>
                           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-0.5">Drop-off</p>
-                          <p className="text-sm text-gray-200">{new Date(ride.endDate).toLocaleString()}</p>
+                          <p className="text-sm text-gray-200">{new Date(ride.endDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
                         </div>
                       </div>
                     </div>
@@ -217,7 +234,6 @@ export default function RideHistory() {
                           <FileText size={16} /> Receipt
                         </button>
                         
-                        {/* ⚡ Hide the button if the review exists */}
                         {!ride.review && (
                           <button 
                             onClick={() => setReviewBooking(ride)}
@@ -279,18 +295,24 @@ export default function RideHistory() {
               <h2 className="text-2xl font-bold text-white">Payment Receipt</h2>
               <p className="text-sm text-gray-400 mt-1 font-mono">ID: {receiptBooking.id}</p>
             </div>
+            
+            {/* ⚡ UPDATED: Receipt Modal with better spacing and added Duration */}
             <div className="p-8 space-y-4 bg-black/20">
-              <div className="flex justify-between items-center text-sm">
+              <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
                 <span className="text-gray-400">Vehicle</span>
                 <span className="text-white font-bold">{receiptBooking.vehicle.name}</span>
               </div>
+              <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                <span className="text-gray-400">Duration</span>
+                <span className="text-white font-bold">{calculateDays(receiptBooking.startDate, receiptBooking.endDate)}</span>
+              </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-400">Pick-up</span>
-                <span className="text-white text-right">{new Date(receiptBooking.startDate).toLocaleString()}</span>
+                <span className="text-white text-right">{new Date(receiptBooking.startDate).toLocaleDateString()}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-400">Drop-off</span>
-                <span className="text-white text-right">{new Date(receiptBooking.endDate).toLocaleString()}</span>
+                <span className="text-white text-right">{new Date(receiptBooking.endDate).toLocaleDateString()}</span>
               </div>
               <div className="border-t border-white/10 pt-4 mt-4 flex justify-between items-center">
                 <span className="text-gray-300 font-bold">Total Paid</span>

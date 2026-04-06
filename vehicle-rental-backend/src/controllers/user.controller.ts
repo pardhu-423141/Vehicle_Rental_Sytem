@@ -79,18 +79,31 @@ export const handleKYC = async (req: any, res: Response) => {
   }
 };
 
+
 // 1. See Profile & KYC Status
 export const getProfile = async (req: any, res: Response) => {
-  const user = await db.user.findUnique({
-    where: { id: req.user.id },
-    include: { kycData: true },
-  });
-  if (!user) return res.status(404).json({ message: "User not found" });
-  
-  const { password, ...safeUser } = user;
-  
-  // THE FIX: Wrap it in an object so the frontend can find 'res.data.user'
-  res.json({ user: safeUser }); 
+  try {
+    // 1. Fetch user and their KYC data
+    const user = await db.user.findUnique({
+      where: { id: req.user.id },
+      include: { kycData: true },
+    });
+
+    // 2. Handle missing user
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // 3. Strip the password out of the response for security
+    const { password, ...safeUser } = user;
+    
+    // 4. Send response (Wrapped in 'user' object for frontend)
+    res.status(200).json({ user: safeUser }); 
+
+  } catch (error) {
+    console.error("Unable to fetch profile:", error);
+    res.status(500).json({ message: "Profile fetch failed. Please try again." });
+  }
 };
 // 2. Update Profile Name
 export const updateProfile = async (req: any, res: Response) => {

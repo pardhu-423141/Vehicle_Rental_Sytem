@@ -73,16 +73,29 @@ export const getUserBookings = async (req: any, res: Response) => {
     const bookings = await db.booking.findMany({
       where: { userId: req.user.id },
       include: { 
+        // Just include the whole vehicle to guarantee we don't miss fields!
         vehicle: true,
-        review: true // ⚡ ADDED: Fetches the attached review if it exists
-      } 
+        review: true 
+      },
+      orderBy: { startDate: 'desc' }
     });
-    res.status(200).json(bookings);
+
+    const formattedBookings = bookings.map(b => ({
+      ...b,
+      vehicle: {
+        id: b.vehicle.id,
+        name: `${b.vehicle.make} ${b.vehicle.model}`,
+        type: b.vehicle.type,
+        // ⚡ MAP IT TO 'image' AND ADD A GUARANTEED FALLBACK
+        image: b.vehicle.imageUrl || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf'
+      }
+    }));
+
+    res.status(200).json(formattedBookings);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch bookings." });
   }
 };
-
 // 3. CANCEL BOOKING
 export const cancelBooking = async (req: any, res: Response) => {
   const { id } = req.params;
@@ -110,12 +123,24 @@ export const getBookingHistory = async (req: any, res: Response) => {
     const history = await db.booking.findMany({
       where: { userId: req.user.id },
       include: { 
-        vehicle: true,
-        review: true // ⚡ ADDED: Fetches the attached review if it exists
+        vehicle: true, 
+        review: true 
       },
       orderBy: { createdAt: 'desc' }
     });
-    res.status(200).json(history);
+
+    const formattedHistory = history.map(b => ({
+      ...b,
+      vehicle: {
+        id: b.vehicle.id,
+        name: `${b.vehicle.make} ${b.vehicle.model}`,
+        type: b.vehicle.type,
+        // ⚡ MAP IT TO 'image' AND ADD A GUARANTEED FALLBACK
+        image: b.vehicle.imageUrl || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf'
+      }
+    }));
+
+    res.status(200).json(formattedHistory);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch booking history" });
   }

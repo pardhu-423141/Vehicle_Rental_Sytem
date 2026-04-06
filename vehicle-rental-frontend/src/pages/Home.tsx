@@ -75,22 +75,6 @@ export default function Home(): JSX.Element {
         </div>
       </div>
 
-      {/* 2. STATS BAR */}
-      <div className="max-w-7xl mx-auto px-6 mb-20 animate-in fade-in duration-1000 delay-300">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem]">
-          {[
-            { label: 'Active Fleet', val: '500+' },
-            { label: 'Verified Pilots', val: '12k' },
-            { label: 'System Uptime', val: '99.9%' },
-            { label: 'Avg Latency', val: '3ms' }
-          ].map((stat, i) => (
-            <div key={i} className="text-center">
-              <p className="text-2xl font-black text-white">{stat.val}</p>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* 3. FEATURES GRID */}
       <div className="max-w-7xl mx-auto py-16 px-6 grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
