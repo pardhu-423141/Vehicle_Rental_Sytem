@@ -90,24 +90,62 @@ export const updateUserRole = async (req: Request, res: Response) => {
 };
 
 // 3. GET ADMIN DASHBOARD STATS
+// 3. GET ADMIN DASHBOARD STATS
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
-    const [userCount, vehicleCount, pendingKYC, activeBookings] = await Promise.all([
+    // 1. Fetch all counts in parallel for maximum speed
+    const [
+      userCount, 
+      vehicleCount, 
+      totalVehicles,
+      pendingKYC, 
+      activeBookings,
+      totalBookings,
+      pendingMaintenance
+    ] = await Promise.all([
       db.user.count(),
-      db.vehicle.count({ where: { deletedAt: null } }),
+      db.vehicle.count({ where: { status: 'available', deletedAt: null } }), // Active
+      db.vehicle.count({ where: { deletedAt: null } }), // Total
       db.user.count({ where: { kycStatus: 'PENDING' } }),
-      db.booking.count({ where: { status: 'ONGOING' } })
+      db.booking.count({ where: { status: 'ONGOING' } }),
+      db.booking.count(), // Total lifetime bookings
+      db.maintenanceTask.count({ where: { status: 'Pending' } }) // Assuming 'Pending' based on your schema
     ]);
 
+    // 2. Calculate Total Revenue (Sum of all COMPLETED bookings)
+    const revenueCalc = await db.booking.aggregate({
+      _sum: { totalPrice: true },
+      where: { status: 'COMPLETED' }
+    });
+    const totalRevenue = revenueCalc._sum.totalPrice || 0;
+
+    // ⚡ 3. Fetch the 5 most recent bookings with User and Vehicle info included
+    const recentBookings = await db.booking.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { name: true } },
+        vehicle: { select: { make: true, model: true } }
+      }
+    });
+
+    // 4. Send it all back in the structure React expects
     res.status(200).json({
       stats: {
         totalUsers: userCount,
         activeVehicles: vehicleCount,
+        totalVehicles: totalVehicles,
         pendingVerifications: pendingKYC,
-        currentRentals: activeBookings
-      }
+        currentRentals: activeBookings,
+        totalBookings: totalBookings,
+        pendingMaintenance: pendingMaintenance,
+        totalRevenue: totalRevenue
+      },
+      recentBookings: recentBookings // ⚡ This populates the table!
     });
+    
   } catch (error) {
+    console.error("Dashboard Stats Error:", error);
     res.status(500).json({ message: "Failed to fetch dashboard stats" });
   }
 };

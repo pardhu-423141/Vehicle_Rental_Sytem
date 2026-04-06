@@ -11,9 +11,7 @@ import {
   addReview, 
   getMyReviews 
 } from '../controllers/review.controller';
-// import { 
-//   getVehicles
-// } from '../controllers/vehicle.controller';
+
 
 const router = Router();
 
@@ -50,14 +48,7 @@ router.post('/kyc', authenticate, authorize(['USER']),upload.fields([
  * VEHICLES & BOOKINGS
  * Discovery and rental lifecycle.
  */
-// 4. Browse available vehicles (Public - no authenticate needed)
-// router.get('/vehicles', getVehicles);
 
-// 5. Book a vehicle (Requires logged-in USER role)
-// router.post('/bookings', authenticate, authorize(['USER']), createBooking);
-
-// // 6. See booking history
-// router.get('/bookings/history', authenticate, authorize(['USER']), getBookingHistory);
 
 
 /**

@@ -1,0 +1,18 @@
+services:
+  backend-service:
+    build: ./vehicle-rental-backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./vehicle-rental-backend/.env
+    # This tells the backend to restart if it crashes
+    restart: always
+
+  frontend-service:
+    build: ./vehicle-rental-frontend
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./vehicle-rental-frontend/.env
+    depends_on:
+      - backend-service

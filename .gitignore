@@ -3,7 +3,8 @@
 # ========================
 .DS_Store
 Thumbs.db
-
+.scannerwork/
+sonar-project.properties
 # ========================
 # Node.js
 # ========================

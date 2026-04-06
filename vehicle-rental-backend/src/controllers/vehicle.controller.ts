@@ -64,7 +64,8 @@ export const addVehicle = async (req: AuthenticatedRequest, res: Response): Prom
         rentalRate: parseFloat(rentalRate.toString()),
         imageUrl,
         type: vehicleType,
-        seatingCapacity: seatingCapacity
+        seatingCapacity: seatingCapacity,
+        status: 'Available' // Ensuring capitalized default
       },
     });
 
@@ -188,8 +189,8 @@ export const restoreVehicle = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
-// Add this function to your existing controller file (where addVehicle, getVehicles, etc. are defined)
 
+// ⚡ UPDATED: getVehicleById NOW FETCHES BOOKINGS TO BLOCK DATES IN CALENDAR ⚡
 export const getVehicleById = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const isAdmin = req.user?.role === 'ADMIN';
@@ -197,6 +198,19 @@ export const getVehicleById = async (req: AuthenticatedRequest, res: Response) =
   try {
     const vehicle = await prisma.vehicle.findUnique({
       where: { id },
+      // 👇 This include block is required so the frontend knows what dates to block
+      include: {
+        bookings: {
+          where: {
+            endDate: { gte: new Date() }, // Only send future or current bookings
+            status: { not: 'CANCELLED' }  // ⚡ Ensure cancelled bookings do NOT block the calendar
+          },
+          select: {
+            startDate: true,
+            endDate: true
+          }
+        }
+      }
     });
 
     if (!vehicle) {
@@ -216,6 +230,7 @@ export const getVehicleById = async (req: AuthenticatedRequest, res: Response) =
     res.status(500).json({ error: "Failed to fetch vehicle." });
   }
 };
+
 // 6. GET VEHICLE HISTORY
 export const getVehicleHistory = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
