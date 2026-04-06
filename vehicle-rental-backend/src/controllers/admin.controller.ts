@@ -40,6 +40,32 @@ export const getAllUsers = async (req: Request, res: Response) => {
   }
 };
 
+// ⚡ NEW: GET ALL STAFF MEMBERS
+export const getStaff = async (req: Request, res: Response) => {
+  try {
+    const staff = await db.user.findMany({
+      where: {
+        role: {
+          in: ['ADMIN', 'VEHICLE_MANAGER', 'USER_MANAGER'] // Add or change roles as needed based on your schema
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.status(200).json(staff);
+  } catch (error) {
+    console.error("Fetch Staff Error:", error);
+    res.status(500).json({ message: "Failed to fetch staff members." });
+  }
+};
+
 // 2. UPDATE USER ROLE (Promotion/Demotion)
 export const updateUserRole = async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -87,9 +113,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 };
 
 // 4. BULK MAINTENANCE TOGGLE
-// Useful for taking multiple cars off the market for a fleet-wide service
 export const toggleMaintenance = async (req: Request, res: Response) => {
-  const { vehicleIds, status } = req.body; // status should be 'maintenance' or 'available'
+  const { vehicleIds, status } = req.body; 
 
   try {
     const updated = await db.vehicle.updateMany({
@@ -108,7 +133,6 @@ export const toggleMaintenance = async (req: Request, res: Response) => {
 };
 
 // 5. GET DELETED VEHICLES (Archive)
-// Admins can see cars that were soft-deleted
 export const getVehicleArchive = async (req: Request, res: Response) => {
   try {
     const archived = await db.vehicle.findMany({
@@ -143,7 +167,6 @@ export const restoreVehicle = async (req: Request, res: Response) => {
 };
 
 // 7. GET ALL BOOKINGS (Global Oversight)
-// Admins see everyone's bookings to resolve disputes
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
     const bookings = await db.booking.findMany({
@@ -163,13 +186,11 @@ export const getAllBookings = async (req: Request, res: Response) => {
 // 8. GET REVENUE REPORTS
 export const getRevenueReports = async (req: Request, res: Response) => {
   try {
-    // 1. Total Revenue from Completed Bookings
     const totalRevenue = await db.booking.aggregate({
       _sum: { totalPrice: true },
       where: { status: 'COMPLETED' }
     });
 
-    // 2. Revenue grouped by month (Last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -182,7 +203,6 @@ export const getRevenueReports = async (req: Request, res: Response) => {
       },
     });
 
-    // 3. Top Earning Vehicles
     const topVehicles = await db.booking.groupBy({
       by: ['vehicleId'],
       _sum: { totalPrice: true },
@@ -194,7 +214,6 @@ export const getRevenueReports = async (req: Request, res: Response) => {
       where: { status: 'COMPLETED' }
     });
 
-    // Fetch vehicle names for the top earners
     const vehicleDetails = await Promise.all(
       topVehicles.map(async (item: { vehicleId: any; _sum: { totalPrice: any; }; _count: { id: any; }; }) => {
         const vehicle = await db.vehicle.findUnique({
@@ -245,11 +264,10 @@ const prisma = new PrismaClient();
 
 export const getMaintenanceTasks = async (req: Request, res: Response) => {
   try {
-    // We fetch vehicles where status is 'maintenance'
     const vehicles = await prisma.vehicle.findMany({
       where: {
         status: "under maintenance",
-        deletedAt: null // Ensure we don't fetch deleted ones
+        deletedAt: null 
       }
     });
     res.json(vehicles);
@@ -260,7 +278,7 @@ export const getMaintenanceTasks = async (req: Request, res: Response) => {
 
 export const resolveMaintenance = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params; // This is the vehicle ID from the URL
+    const { id } = req.params; 
     
     await prisma.vehicle.update({
       where: { id: id },

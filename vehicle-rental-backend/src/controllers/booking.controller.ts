@@ -1,10 +1,6 @@
 import { Response } from 'express';
-import { db } from '../config/db'; // Using your Prisma 7 adapter instance
+import { db } from '../config/db'; 
 
-/**
- * Interface to handle the extended Express Request 
- * established in your index.ts
- */
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
@@ -16,14 +12,13 @@ interface AuthenticatedRequest extends Request {
 // 1. CREATE A NEW BOOKING
 export const createBooking = async (req: any, res: Response) => {
   const { vehicleId, startDate, endDate } = req.body;
-  const userId = req.user?.id; // Set by your authenticate middleware
+  const userId = req.user?.id; 
 
   try {
-    // Check if vehicle exists and hasn't been soft-deleted
     const vehicle = await db.vehicle.findUnique({
       where: { 
         id: vehicleId,
-        deletedAt: null // Only active vehicles can be booked
+        deletedAt: null 
       }
     });
 
@@ -31,7 +26,6 @@ export const createBooking = async (req: any, res: Response) => {
       return res.status(404).json({ message: "Vehicle not found or no longer available." });
     }
 
-    // Date Validation: Check for overlapping confirmed bookings
     const overlappingBooking = await db.booking.findFirst({
       where: {
         vehicleId: vehicleId,
@@ -49,11 +43,10 @@ export const createBooking = async (req: any, res: Response) => {
       return res.status(400).json({ message: "Vehicle is already booked for these dates." });
     }
 
-    // Logic: Calculate total price based on rentalRate
     const start = new Date(startDate);
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; // Minimum 1 day
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
     const totalPrice = diffDays * vehicle.rentalRate;
 
     const newBooking = await db.booking.create({
@@ -79,7 +72,10 @@ export const getUserBookings = async (req: any, res: Response) => {
   try {
     const bookings = await db.booking.findMany({
       where: { userId: req.user.id },
-      include: { vehicle: true } // Include vehicle details for the UI
+      include: { 
+        vehicle: true,
+        review: true // ⚡ ADDED: Fetches the attached review if it exists
+      } 
     });
     res.status(200).json(bookings);
   } catch (error) {
@@ -108,12 +104,15 @@ export const cancelBooking = async (req: any, res: Response) => {
   }
 };
 
-// Missing member fix for user.routes.ts
+// 4. GET BOOKING HISTORY
 export const getBookingHistory = async (req: any, res: Response) => {
   try {
     const history = await db.booking.findMany({
       where: { userId: req.user.id },
-      include: { vehicle: true },
+      include: { 
+        vehicle: true,
+        review: true // ⚡ ADDED: Fetches the attached review if it exists
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.status(200).json(history);

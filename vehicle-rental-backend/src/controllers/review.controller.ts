@@ -7,41 +7,39 @@ import { db } from '../config/db'; // Using your Prisma 7 adapter
 
 // 1. ADD A REVIEW
 export const addReview = async (req: any, res: Response) => {
-  const { vehicleId, rating, comment } = req.body;
-  const userId = req.user?.id; // Set by your authenticate middleware
+  // ⚡ ADDED: We now extract bookingId from the frontend request
+  const { vehicleId, bookingId, rating, comment } = req.body;
+  const userId = req.user?.id; 
 
   try {
-    // Check if the user has a COMPLETED booking for this vehicle
-    // This prevents fake reviews
-    const hasCompletedBooking = await db.booking.findFirst({
-      where: {
-        userId,
-        vehicleId,
-        status: 'COMPLETED'
-      }
+    // ⚡ 1. Verify this specific booking exists, belongs to the user, and is COMPLETED
+    const booking = await db.booking.findUnique({
+      where: { id: bookingId }
     });
 
-    if (!hasCompletedBooking) {
+    if (!booking || booking.userId !== userId || booking.status !== 'COMPLETED') {
       return res.status(403).json({ 
-        message: "You can only review a vehicle after completing a rental." 
+        message: "You can only review a vehicle after completing that specific rental." 
       });
     }
 
-    // Check if user already reviewed this vehicle
-    const existingReview = await db.review.findFirst({
-      where: { userId, vehicleId }
+    // ⚡ 2. Check if they already reviewed THIS specific trip
+    const existingReview = await db.review.findUnique({
+      where: { bookingId }
     });
 
     if (existingReview) {
-      return res.status(400).json({ message: "You have already reviewed this vehicle." });
+      return res.status(400).json({ message: "You have already reviewed this trip." });
     }
 
+    // ⚡ 3. Create the review with the bookingId included!
     const newReview = await db.review.create({
       data: {
         rating: Number(rating),
         comment,
         userId,
-        vehicleId
+        vehicleId,
+        bookingId 
       }
     });
 
@@ -61,7 +59,7 @@ export const getVehicleReviews = async (req: any, res: Response) => {
       where: { vehicleId },
       include: {
         user: {
-          select: { name: true } // Only send the reviewer's name
+          select: { name: true } // Only send the reviewer's name to the frontend
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -99,7 +97,7 @@ export const deleteReview = async (req: any, res: Response) => {
   }
 };
 
-// Missing member fix for user.routes.ts
+// 4. GET LOGGED-IN USER'S REVIEWS
 export const getMyReviews = async (req: any, res: Response) => {
   try {
     const reviews = await db.review.findMany({

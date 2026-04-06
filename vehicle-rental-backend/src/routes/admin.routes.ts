@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { 
   getAllUsers, 
+  getStaff, // ⚡ ADDED: Imported getStaff
   updateUserRole, 
   getDashboardStats,
   toggleMaintenance,  
@@ -11,7 +12,7 @@ import {
   getRecentTransactions    
 } from '../controllers/admin.controller';
 
-import { getVehicles, addVehicle,removeVehicle,updateVehicle } from '../controllers/vehicle.controller';
+import { getVehicles, addVehicle, removeVehicle, updateVehicle } from '../controllers/vehicle.controller';
 
 import { authenticate, isAdmin } from '../middleware/auth.middleware';
 import { getMaintenanceTasks, resolveMaintenance } from '../controllers/admin.controller';
@@ -37,6 +38,13 @@ router.patch('/vehicles/restore/:id', restoreVehicle);    // Restore soft-delete
  * @desc    Get list of all users
  */
 router.get('/users', getAllUsers);
+
+/**
+ * @route   GET /api/admin/staff
+ * @desc    Get list of all staff members (Admins, Managers)
+ */
+// ⚡ ADDED: The route your frontend is trying to call
+router.get('/staff', getStaff);
 
 /**
  * @route   PATCH /api/admin/users/role/:id

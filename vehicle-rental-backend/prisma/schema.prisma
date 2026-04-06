@@ -4,7 +4,7 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"       
+  provider = "prisma-client-js"
 }
 
 enum Role {
@@ -22,29 +22,30 @@ enum KYCStatus {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  name         String
-  password     String
-  role         Role      @default(USER)
-  
+  id       String @id @default(uuid())
+  email    String @unique
+  name     String
+  password String
+  role     Role   @default(USER)
+
   // Verification Fields
-  isVerified   Boolean   @default(false)
-  otp          String?   // Stores the 6-digit code
-  otpExpires   DateTime? 
+  isVerified Boolean   @default(false)
+  otp        String? // Stores the 6-digit code
+  otpExpires DateTime?
 
   // KYC & Profile
   kycStatus KYCStatus @default(NOT_SUBMITTED)
-  kycData      KYCData?
-  
+  kycData   KYCData?
+
   // Relations & Timestamps
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  bookings     Booking[]
-  reviews      Review[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  bookings  Booking[]
+  reviews   Review[]
 
   managedVehicles Vehicle[]
 }
+
 enum VehicleType {
   TWO_WHEELER
   FOUR_SEATER
@@ -54,54 +55,57 @@ enum VehicleType {
 }
 
 model Vehicle {
-  id            String    @id @default(uuid())
-  make          String    // e.g., Toyota
-  model         String    // e.g., Camry
-  year          Int
-  licensePlate  String    @unique
-  color         String
-  fuelType      String    // Petrol, Diesel, Electric
-  transmission  String    // Manual, Automatic
-  rentalRate    Float     // Price per day/hour
-  imageUrl      String?
-  
+  id           String  @id @default(uuid())
+  make         String // e.g., Toyota
+  model        String // e.g., Camry
+  year         Int
+  licensePlate String  @unique
+  color        String
+  fuelType     String // Petrol, Diesel, Electric
+  transmission String // Manual, Automatic
+  rentalRate   Float // Price per day/hour
+  imageUrl     String?
+
   // --- NEW FIELDS ---
-  type          VehicleType @default(FIVE_SEATER)
-  seatingCapacity Int       @default(5) 
+  type            VehicleType @default(FIVE_SEATER)
+  seatingCapacity Int         @default(5)
   // ------------------
 
-  status        String    @default("available") 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime? 
-  
-  bookings      Booking[]
-  reviews       Review[]
+  status    String    @default("available")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  bookings Booking[]
+  reviews  Review[]
 
   // ⚡ ADD THESE TWO LINES:
-  managerId       String?  // Optional, because a new car might not be assigned immediately
-  manager         User?    @relation(fields: [managerId], references: [id])
+  managerId String? // Optional, because a new car might not be assigned immediately
+  manager   User?   @relation(fields: [managerId], references: [id])
 
   // ⚡ ADD THIS LINE:
   maintenanceTasks MaintenanceTask[]
 }
 
 model Booking {
-  id              String   @id @default(uuid())
-  userId          String
-  vehicleId       String
-  startDate       DateTime
-  endDate         DateTime
-  totalPrice      Float
-  status          BookingStatus @default(PENDING)
-  
+  id         String        @id @default(uuid())
+  userId     String
+  vehicleId  String
+  startDate  DateTime
+  endDate    DateTime
+  totalPrice Float
+  status     BookingStatus @default(PENDING)
+
   // Relations
-  user            User     @relation(fields: [userId], references: [id])
-  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id])
-  payment         Payment? // One-to-one relationship with Payment
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  user    User     @relation(fields: [userId], references: [id])
+  vehicle Vehicle  @relation(fields: [vehicleId], references: [id])
+  payment Payment? // One-to-one relationship with Payment
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ⚡ ADD THIS LINE to tell Booking it has a Review!
+  review Review?
 }
 
 enum BookingStatus {
@@ -113,17 +117,17 @@ enum BookingStatus {
 }
 
 model Payment {
-  id              String        @id @default(uuid())
-  bookingId       String        @unique
-  amount          Float
-  paymentMethod   String        // e.g., "STRIPE", "PAYPAL", "CREDIT_CARD"
-  status          PaymentStatus @default(PENDING)
-  transactionId   String?       @unique // ID from the payment gateway
-  
+  id            String        @id @default(uuid())
+  bookingId     String        @unique
+  amount        Float
+  paymentMethod String // e.g., "STRIPE", "PAYPAL", "CREDIT_CARD"
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @unique // ID from the payment gateway
+
   // Relations
-  booking         Booking       @relation(fields: [bookingId], references: [id])
-  
-  createdAt       DateTime      @default(now())
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  createdAt DateTime @default(now())
 }
 
 enum PaymentStatus {
@@ -133,43 +137,46 @@ enum PaymentStatus {
   REFUNDED
 }
 
-
 model Review {
-  id          String   @id @default(uuid())
-  rating      Int      // 1 to 5
-  comment     String?
-  userId      String
-  vehicleId   String
-  
+  id        String  @id @default(uuid())
+  rating    Int // 1 to 5
+  comment   String?
+  userId    String
+  vehicleId String
+
   // Relations
-  user        User     @relation(fields: [userId], references: [id])
-  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
-  
-  createdAt   DateTime @default(now())
+  user    User    @relation(fields: [userId], references: [id])
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  // ⚡ THIS IS THE MISSING HANDSHAKE:
+  bookingId String  @unique
+  booking   Booking @relation(fields: [bookingId], references: [id])
 }
 
 model KYCData {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  idType         String   // e.g., "Driving License", "Passport"
-  idNumber       String   @unique
-  idImageFront   String   // URL to image storage (S3/Cloudinary)
-  idImageBack    String?
-  
+  id           String  @id @default(uuid())
+  userId       String  @unique
+  idType       String // e.g., "Driving License", "Passport"
+  idNumber     String  @unique
+  idImageFront String // URL to image storage (S3/Cloudinary)
+  idImageBack  String?
+
   // Relations
-  user           User     @relation(fields: [userId], references: [id])
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ADD THIS MODEL:
 model MaintenanceTask {
   id           String   @id @default(uuid())
-  issue        String   // The reason entered during return
+  issue        String // The reason entered during return
   status       String   @default("Pending") // Pending, In Progress, Resolved
   reportedDate DateTime @default(now())
-  
-  vehicleId    String
-  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
 }

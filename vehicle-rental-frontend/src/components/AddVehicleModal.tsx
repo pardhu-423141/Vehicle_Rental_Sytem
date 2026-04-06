@@ -1,19 +1,20 @@
-// AddVehicleModal.tsx
 import React, { useState, useEffect } from 'react';
-import { X, IndianRupee, Loader2, CarFront } from 'lucide-react';
+import { X, IndianRupee, Loader2, CarFront, UserCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Vehicle } from './VehicleCard';
 import axios from 'axios';
+import api from '../api/axios'; // Make sure this points to your configured axios instance
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  initialData?: Vehicle | null;
+  initialData?: any | null; // Using any to accommodate the managerId passed from FleetManagement
 }
 
 export default function AddVehicleModal({ isOpen, onClose, onSuccess, initialData }: Props) {
   const [loading, setLoading] = useState(false);
+  const [managers, setManagers] = useState<any[]>([]); // ⚡ NEW: State to hold staff list
   const isEditMode = !!initialData;
 
   const [formData, setFormData] = useState({
@@ -27,9 +28,11 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess, initialDat
     rentalRate: '',
     imageUrl: '',
     status: 'Available',
-    type: 'FIVE_SEATER' // Added default enum value
+    type: 'FIVE_SEATER',
+    managerId: '' // ⚡ NEW: State for assigned manager
   });
 
+  // 1. Handle Initial Data when opening modal
   useEffect(() => {
     if (initialData && isOpen) {
       setFormData({
@@ -43,61 +46,82 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess, initialDat
         rentalRate: initialData.price?.toString() || '',
         imageUrl: initialData.image || '',
         status: initialData.status || 'Available',
-        type: initialData.type || 'FIVE_SEATER'
+        type: initialData.type || 'FIVE_SEATER',
+        managerId: initialData.managerId || '' // ⚡ Load existing manager if editing
       });
     } else if (!initialData && isOpen) {
       setFormData({
         make: '', model: '', year: new Date().getFullYear().toString(),
         licensePlate: '', color: 'White', fuelType: 'PETROL',
         transmission: 'MANUAL', rentalRate: '', imageUrl: '', status: 'Available',
-        type: 'FIVE_SEATER'
+        type: 'FIVE_SEATER', managerId: ''
       });
     }
   }, [initialData, isOpen]);
 
-  if (!isOpen) return null;
+// 2. ⚡ NEW: Fetch Staff list for the dropdown
+  useEffect(() => {
+    const fetchManagers = async () => {
+      try {
+        const { data } = await api.get('/admin/staff');
+        
+        // ⚡ FILTER: Strictly grab ONLY the Vehicle Managers
+        const strictlyVehicleManagers = data.filter((manager: any) => manager.role === 'VEHICLE_MANAGER');
+        
+        setManagers(strictlyVehicleManagers);
+      } catch (error) {
+        console.error("Failed to fetch managers", error);
+      }
+    };
+    
+    if (isOpen) {
+      fetchManagers();
+    }
+  }, [isOpen]);
 
-  // AddVehicleModal.tsx
+  // 3. Handle Form Submission (Add OR Edit)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+    const token = localStorage.getItem('token'); 
 
-  // 1. Manually get the token from localStorage
-  const token = localStorage.getItem('token'); 
+    // Format your payload
+    const payload = {
+      ...formData,
+      year: Number(formData.year),
+      rentalRate: parseFloat(formData.rentalRate),
+      // If managerId is empty string, send null so it unassigns them
+      managerId: formData.managerId === '' ? null : formData.managerId
+    };
 
-  // 2. Format your payload
-  const payload = {
-    ...formData,
-    year: Number(formData.year),
-    rentalRate: parseFloat(formData.rentalRate),
-    // Ensure 'type' matches your Enum (e.g., "FIVE_SEATER")
+    try {
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true 
+      };
+
+      // ⚡ Handle EDIT vs CREATE dynamically
+      if (isEditMode && initialData) {
+        await axios.put(`http://localhost:5000/api/admin/vehicles/${initialData.id}`, payload, config);
+        toast.success("Vehicle Updated Successfully!");
+      } else {
+        await axios.post('http://localhost:5000/api/admin/vehicles', payload, config);
+        toast.success("Vehicle Added Successfully!");
+      }
+
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error("Submit Error:", err.response?.data);
+      const errorMsg = err.response?.data?.message || "Operation failed";
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  try {
-    // 3. Pass the token in the config object (3rd argument of axios.post)
-    const response = await axios.post(
-      'http://localhost:5000/api/admin/vehicles', 
-      payload, 
-      {
-        headers: {
-          Authorization: `Bearer ${token}` // 🛡️ This is what the backend is looking for
-        },
-        withCredentials: true // Only keep this if your backend uses both cookies & tokens
-      }
-    );
-
-    toast.success("Vehicle Added Successfully!");
-    onSuccess();
-    onClose();
-  } catch (err: any) {
-    console.error("Submit Error:", err.response?.data);
-    const errorMsg = err.response?.data?.message || "Operation failed";
-    toast.error(errorMsg);
-  } finally {
-    setLoading(false);
-  }
-};
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -119,12 +143,33 @@ const handleSubmit = async (e: React.FormEvent) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+          
+          {/* ⚡ NEW: MANAGER ASSIGNMENT DROPDOWN */}
+          <div className="bg-blue-500/10 border border-blue-500/20 p-5 rounded-2xl mb-6">
+            <label className="text-xs font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+              <UserCircle size={16} /> Assign Fleet Manager
+            </label>
+            <select
+              value={formData.managerId}
+              onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
+              className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+            >
+              <option value="">-- Unassigned (General Fleet Pool) --</option>
+              {managers.map((manager) => (
+                <option key={manager.id} value={manager.id}>
+                  {manager.name} ({manager.role.replace('_', ' ')})
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-gray-500 mt-2">
+              Assigned managers will receive alerts for maintenance and operations regarding this specific vehicle.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-            
             <div className="space-y-4">
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-tight">Basic Information</h4>
               
-              {/* Added Vehicle Type Dropdown */}
               <div className="relative">
                 <CarFront className="absolute left-3 top-3.5 text-blue-400" size={18} />
                 <select 

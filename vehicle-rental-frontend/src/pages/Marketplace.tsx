@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { IndianRupee, UserCircle, Car, Bike, CarFront, LayoutGrid, Loader2, ShieldAlert } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { 
+  IndianRupee, UserCircle, Car, Bike, CarFront, LayoutGrid, 
+  Loader2, ShieldAlert, MessageSquare, Star, X, ChevronRight, 
+  Fuel, Settings, Users 
+} from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom'; // ⚡ ADDED useNavigate
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -43,11 +47,17 @@ const categories = [
 
 export default function Marketplace() {
   const { user } = useAuth();
+  const navigate = useNavigate(); // ⚡ ADDED
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
+
+  // ⚡ ADDED: States for Vehicle Details Modal & Reviews
+  const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   // Fetch KYC status from backend or use auth context
   useEffect(() => {
@@ -87,6 +97,26 @@ export default function Marketplace() {
 
     fetchVehicles();
   }, []);
+
+  // ⚡ ADDED: Fetch Reviews when a vehicle is selected for viewing
+  useEffect(() => {
+    if (viewingVehicle) {
+      const fetchReviews = async () => {
+        try {
+          setLoadingReviews(true);
+          // Assuming your backend route for getting a vehicle's reviews is GET /reviews/:vehicleId
+          const res = await api.get(`/reviews/${viewingVehicle.id}`);
+          setReviews(res.data);
+        } catch (err) {
+          console.error("Failed to fetch reviews", err);
+          setReviews([]);
+        } finally {
+          setLoadingReviews(false);
+        }
+      };
+      fetchReviews();
+    }
+  }, [viewingVehicle]);
 
   // Filter vehicles based on selected category
   const filteredVehicles = vehicles.filter(vehicle => {
@@ -246,24 +276,20 @@ export default function Marketplace() {
 
                   {/* Booking Action */}
                   {isBookingAllowed ? (
-                    <Link
-                      to={`/checkout/${vehicle.id}`}
+                    // ⚡ CHANGED: Instead of a Link straight to checkout, open the details modal
+                    <button
+                      onClick={() => setViewingVehicle(vehicle)}
                       className="mt-4 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-center shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"
                     >
-                      Book Now
-                    </Link>
+                      View Details & Book
+                    </button>
                   ) : (
+                    // ⚡ CHANGED: Give non-KYC users the ability to at least view details too!
                     <button
-                      onClick={() =>
-                        toast.error(
-                          'Please complete KYC verification before booking a vehicle.',
-                          { duration: 4000, icon: '🔒' }
-                        )
-                      }
-                      className="mt-4 w-full py-3 bg-gray-600/50 text-gray-300 font-bold rounded-xl text-center cursor-not-allowed flex items-center justify-center gap-2"
+                      onClick={() => setViewingVehicle(vehicle)}
+                      className="mt-4 w-full py-3 bg-gray-600/50 hover:bg-gray-600/70 text-gray-300 font-bold rounded-xl text-center transition-colors flex items-center justify-center gap-2"
                     >
-                      <ShieldAlert size={18} />
-                      Verify KYC to Book
+                      View Details (KYC Required to Book)
                     </button>
                   )}
                 </div>
@@ -282,6 +308,130 @@ export default function Marketplace() {
           </p>
         </div>
       )}
+
+      {/* ⚡ ADDED: VEHICLE DETAIL MODAL */}
+      {viewingVehicle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#0f1115] border border-white/10 w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] overflow-hidden flex flex-col md:flex-row shadow-2xl relative">
+            
+            <button 
+              onClick={() => setViewingVehicle(null)} 
+              className="absolute top-6 right-6 z-20 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Left Column: Media */}
+            <div className="w-full md:w-1/2 h-64 md:h-auto bg-black relative">
+              <img 
+                src={viewingVehicle.imageUrl || '/placeholder-car.jpg'} 
+                className="w-full h-full object-cover" 
+                alt={`${viewingVehicle.make} ${viewingVehicle.model}`} 
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
+            </div>
+
+            {/* Right Column: Details, Specs, Reviews, & Checkout Action */}
+            <div className="flex-1 p-8 md:p-10 overflow-y-auto custom-scrollbar flex flex-col">
+              <div className="mb-6">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+                  {viewingVehicle.status}
+                </span>
+                <h2 className="text-3xl font-black text-white mt-4">
+                  {viewingVehicle.make} {viewingVehicle.model}
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  {viewingVehicle.year} Edition • {viewingVehicle.color} • Plate: {viewingVehicle.licensePlate}
+                </p>
+              </div>
+
+              {/* Specs Grid */}
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="bg-white/5 p-3 rounded-2xl border border-white/5 text-center">
+                  <Fuel size={16} className="text-gray-500 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-500 uppercase font-bold">Fuel</p>
+                  <p className="text-xs text-white font-bold">{viewingVehicle.fuelType}</p>
+                </div>
+                <div className="bg-white/5 p-3 rounded-2xl border border-white/5 text-center">
+                  <Settings size={16} className="text-gray-500 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-500 uppercase font-bold">Trans</p>
+                  <p className="text-xs text-white font-bold">{viewingVehicle.transmission}</p>
+                </div>
+                <div className="bg-white/5 p-3 rounded-2xl border border-white/5 text-center">
+                  <Users size={16} className="text-gray-500 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-500 uppercase font-bold">Capacity</p>
+                  <p className="text-xs text-white font-bold">{viewingVehicle.seatingCapacity} Ppl</p>
+                </div>
+              </div>
+
+              {/* Reviews Section */}
+              <div className="flex-1 mb-8">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                  <MessageSquare size={16} className="text-blue-400" /> User Reviews
+                </h3>
+                
+                {loadingReviews ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="animate-spin text-blue-500" />
+                  </div>
+                ) : reviews.length > 0 ? (
+                  <div className="space-y-4 max-h-48 overflow-y-auto pr-2">
+                    {reviews.map((rev: any) => (
+                      <div key={rev.id} className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-bold text-white">{rev.user?.name || 'Verified Renter'}</span>
+                          <div className="flex gap-0.5 text-yellow-500">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} size={10} fill={i < rev.rating ? "currentColor" : "none"} />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-gray-400 leading-relaxed italic">"{rev.comment}"</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 italic p-4 bg-white/5 rounded-2xl border border-dashed border-white/10 text-center">
+                    No reviews yet. Be the first to rent and review this vehicle!
+                  </p>
+                )}
+              </div>
+
+              {/* Final Action Bar */}
+              <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between gap-6">
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Rental Rate</p>
+                  <p className="text-2xl font-black text-white flex items-center">
+                    <IndianRupee size={20}/>{viewingVehicle.rentalRate}
+                    <span className="text-xs text-gray-500 ml-1 font-normal">/day</span>
+                  </p>
+                </div>
+                
+                {isBookingAllowed ? (
+                  // Navigate to Checkout!
+                  <button 
+                    onClick={() => navigate(`/checkout/${viewingVehicle.id}`)}
+                    className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-900/40 transition active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    Proceed to Checkout <ChevronRight size={18} />
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => { 
+                      setViewingVehicle(null); 
+                      toast.error("Please complete KYC verification before booking."); 
+                    }}
+                    className="flex-1 py-4 bg-gray-600/50 text-gray-300 font-bold rounded-2xl cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <ShieldAlert size={18} /> Complete KYC
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
