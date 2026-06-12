@@ -1,14 +1,14 @@
 import { Request, Response } from 'express';
 import { PrismaClient, Role, BookingStatus } from '@prisma/client';
+import { logVehicleStatus } from '../utils/vehicleStatusLogger';
 
 const prisma = new PrismaClient();
 
-// ✅ FIX 1: Added email and exact Role type to match your global types
 interface AuthenticatedRequest extends Request {
-  user?: { 
-    id: string; 
+  user?: {
+    id: string;
     email: string;
-    role: Role; 
+    role: Role;
   };
 }
 
@@ -18,18 +18,17 @@ export const getOperationsQueue = async (req: AuthenticatedRequest, res: Respons
 
   try {
     const handovers = await prisma.booking.findMany({
-      where: { 
-        status: BookingStatus.PENDING, // Using the strict Prisma Enum
-        vehicle: { managerId: managerId } 
+      where: {
+        status: BookingStatus.CONFIRMED,
+        vehicle: { managerId: managerId }
       },
       include: { user: true, vehicle: true },
       orderBy: { startDate: 'asc' }
     });
 
     const returns = await prisma.booking.findMany({
-      where: { 
-        // ✅ FIX 2: Changed to ACTIVE (Update this if your schema uses a different word like ONGOING)
-        status: BookingStatus.ONGOING, 
+      where: {
+        status: BookingStatus.ONGOING,
         vehicle: { managerId: managerId }
       },
       include: { user: true, vehicle: true },
@@ -46,15 +45,21 @@ export const getOperationsQueue = async (req: AuthenticatedRequest, res: Respons
 // 2. PROCESS HANDOVER (Give keys to customer)
 export const processHandover = async (req: AuthenticatedRequest, res: Response) => {
   const { bookingId } = req.params;
+  const managerId = req.user?.id as string;
 
   try {
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
     if (!booking) return res.status(404).json({ error: "Booking not found" });
 
+    const now = new Date();
+
     await prisma.$transaction([
       prisma.booking.update({
         where: { id: bookingId },
-        data: { status: BookingStatus.ONGOING } // ✅ FIX 2 applied here
+        data: {
+          status: BookingStatus.ONGOING,
+          handoverAt: now
+        }
       }),
       prisma.vehicle.update({
         where: { id: booking.vehicleId },
@@ -62,8 +67,16 @@ export const processHandover = async (req: AuthenticatedRequest, res: Response) 
       })
     ]);
 
+    await logVehicleStatus(prisma, {
+      vehicleId: booking.vehicleId,
+      status: 'In Use',
+      changedBy: managerId,
+      reason: `Keys handed over for booking ${bookingId}`
+    });
+
     res.status(200).json({ message: "Handover processed successfully" });
   } catch (error) {
+    console.error("Handover Error:", error);
     res.status(500).json({ error: "Failed to process handover" });
   }
 };
@@ -71,19 +84,23 @@ export const processHandover = async (req: AuthenticatedRequest, res: Response) 
 // 3. PROCESS RETURN (Take keys back & Handle Issues)
 export const processReturn = async (req: AuthenticatedRequest, res: Response) => {
   const { bookingId } = req.params;
-  const { condition, reason } = req.body; // ⚡ Added 'reason'
+  const { condition, reason } = req.body;
+  const managerId = req.user?.id as string;
 
   try {
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
     if (!booking) return res.status(404).json({ error: "Booking not found" });
 
+    const now = new Date();
     const newVehicleStatus = condition === 'good' ? 'Available' : 'Under Maintenance';
 
-    // We will build an array of database operations to execute in a transaction
     const operations: any[] = [
       prisma.booking.update({
         where: { id: bookingId },
-        data: { status: BookingStatus.COMPLETED }
+        data: {
+          status: BookingStatus.COMPLETED,
+          returnAt: now
+        }
       }),
       prisma.vehicle.update({
         where: { id: booking.vehicleId },
@@ -91,7 +108,6 @@ export const processReturn = async (req: AuthenticatedRequest, res: Response) =>
       })
     ];
 
-    // ⚡ If there's an issue, create a Maintenance Task
     if (condition === 'maintenance' && reason) {
       operations.push(
         prisma.maintenanceTask.create({
@@ -106,6 +122,15 @@ export const processReturn = async (req: AuthenticatedRequest, res: Response) =>
 
     await prisma.$transaction(operations);
 
+    await logVehicleStatus(prisma, {
+      vehicleId: booking.vehicleId,
+      status: newVehicleStatus,
+      changedBy: managerId,
+      reason: condition === 'good'
+        ? `Vehicle returned in good condition (booking ${bookingId})`
+        : `Vehicle flagged for maintenance: ${reason}`
+    });
+
     res.status(200).json({ message: "Return processed successfully" });
   } catch (error) {
     console.error("Return Process Error:", error);
@@ -119,8 +144,8 @@ export const getMaintenanceTasks = async (req: AuthenticatedRequest, res: Respon
 
   try {
     const tasks = await prisma.maintenanceTask.findMany({
-      where: { vehicle: { managerId: managerId } }, // Only fetch tasks for cars this manager owns
-      include: { vehicle: true }, // Pull in the car details (Make, Model, Plate)
+      where: { vehicle: { managerId: managerId } },
+      include: { vehicle: true },
       orderBy: { reportedDate: 'desc' }
     });
 
@@ -134,20 +159,31 @@ export const getMaintenanceTasks = async (req: AuthenticatedRequest, res: Respon
 // 5. UPDATE MAINTENANCE TASK STATUS
 export const updateMaintenanceTask = async (req: AuthenticatedRequest, res: Response) => {
   const { taskId } = req.params;
-  const { status } = req.body; // 'In Progress' or 'Resolved'
+  const { status } = req.body;
+  const managerId = req.user?.id as string;
 
   try {
-    // Update the task itself
+    const updateData: any = { status };
+    if (status === 'Resolved') {
+      updateData.resolvedAt = new Date();
+    }
+
     const task = await prisma.maintenanceTask.update({
       where: { id: taskId },
-      data: { status }
+      data: updateData
     });
 
-    // ⚡ If the mechanic marked it resolved, put the car back in the active fleet!
     if (status === 'Resolved') {
       await prisma.vehicle.update({
         where: { id: task.vehicleId },
         data: { status: 'Available' }
+      });
+
+      await logVehicleStatus(prisma, {
+        vehicleId: task.vehicleId,
+        status: 'Available',
+        changedBy: managerId,
+        reason: `Maintenance task ${taskId} resolved`
       });
     }
 

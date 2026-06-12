@@ -1,13 +1,15 @@
 import { Router } from 'express';
-import { registerUser,loginUser,verifyOTP , logoutUser} from '../controllers/auth.controller';
+import { loginUser, registerUser, verifyOTP, logoutUser } from '../controllers/auth.controller';
 
 const router = Router();
 
-// Endpoint: POST /api/auth/register
-router.post('/register', registerUser);
+// NOTE: This file must only contain authentication routes.
+// Cookie-based auth is handled by the backend controller + auth.middleware.
 
-// Endpoint: POST /api/auth/login
 router.post('/login', loginUser);
+router.post('/register', registerUser);
 router.post('/verify-otp', verifyOTP);
 router.post('/logout', logoutUser);
+
 export default router;
+

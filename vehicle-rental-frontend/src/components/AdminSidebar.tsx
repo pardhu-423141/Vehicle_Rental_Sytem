@@ -1,18 +1,19 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom'; // 1. Added useNavigate
-import { 
-  LayoutDashboard, 
-  Car, 
-  Users, 
-  ShieldCheck, 
-  Wrench, 
-  UserCog, 
-  LogOut, 
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Car,
+  Users,
+  ShieldCheck,
+  Wrench,
+  UserCog,
+  LogOut,
   X,
-  MessageSquareWarning
+  MessageSquareWarning,
+  TrendingUp
 } from 'lucide-react';
 
-import { useAuth } from '../context/AuthContext'; 
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -21,15 +22,14 @@ interface SidebarProps {
 
 export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
-  const navigate = useNavigate(); // 2. Initialize navigate
+  const navigate = useNavigate();
   const { logout } = useAuth();
 
-  // 3. Create a dedicated Logout Handler
   const handleLogout = async () => {
     try {
-      setIsOpen(false); // Close the sidebar first for smooth UI
-      await logout();   // Execute the logout logic from Context
-      navigate('/login', { replace: true }); // 4. Force redirect to login
+      setIsOpen(false);
+      await logout();
+      navigate('/login', { replace: true });
     } catch (error) {
       console.error("Logout failed:", error);
     }
@@ -51,6 +51,12 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
       ]
     },
     {
+      label: 'Finance',
+      items: [
+        { name: 'Revenue Reports', path: '/admin/revenue', icon: TrendingUp },
+      ]
+    },
+    {
       label: 'User & Staff Control',
       items: [
         { name: 'KYC Verifications', path: '/admin/kyc', icon: ShieldCheck },
@@ -62,21 +68,18 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   return (
     <>
-      {/* Overlay for mobile */}
-      <div 
+      <div
         className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] transition-opacity duration-300 ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setIsOpen(false)}
       />
 
-      {/* Sidebar Container */}
       <aside className={`fixed top-0 left-0 h-full w-72 z-[70] bg-white/10 backdrop-blur-2xl border-r border-white/20 shadow-2xl transition-transform duration-500 ease-in-out transform ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="p-8 flex flex-col h-full overflow-y-auto custom-scrollbar">
-          
-          {/* Logo Section */}
+
           <div className="flex items-center justify-between mb-10">
             <h2 className="text-2xl font-bold text-white italic tracking-tighter">
               DRIVE<span className="text-blue-400">ADMIN</span>
@@ -86,7 +89,6 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
             </button>
           </div>
 
-          {/* Grouped Navigation */}
           <div className="flex-1 space-y-8">
             {menuGroups.map((group) => (
               <div key={group.label}>
@@ -100,8 +102,8 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
                       to={item.path}
                       onClick={() => setIsOpen(false)}
                       className={`flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 border ${
-                        location.pathname === item.path 
-                          ? 'bg-blue-600/40 border-blue-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.2)]' 
+                        location.pathname === item.path
+                          ? 'bg-blue-600/40 border-blue-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.2)]'
                           : 'border-transparent text-gray-300 hover:bg-white/5 hover:text-white'
                       }`}
                     >
@@ -114,9 +116,8 @@ export default function AdminSidebar({ isOpen, setIsOpen }: SidebarProps) {
             ))}
           </div>
 
-          {/* Exit / Logout */}
-          <button 
-            onClick={handleLogout} // Updated to use the handler
+          <button
+            onClick={handleLogout}
             className="flex items-center gap-3 px-5 py-4 mt-8 text-red-400 hover:bg-red-500/10 rounded-2xl transition-all border border-transparent hover:border-red-500/20 group w-full text-left"
           >
             <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />

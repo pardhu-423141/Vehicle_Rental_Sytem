@@ -22,20 +22,16 @@ export default function Login() {
         withCredentials: true // Important for cookies
       });
 
-      // --- THE FIX STARTS HERE ---
-      // 1. Extract the token from the response
-      const { token, user } = res.data;
-
-      // 2. Save the token to localStorage for our Axios interceptors
-      if (token) {
-        localStorage.setItem('token', token);
+      const user = res.data.user;
+      if (!user) {
+        throw new Error('Login succeeded but user data was missing.');
       }
-      // --- THE FIX ENDS HERE ---
 
       toast.success('Access Granted. Welcome back!');
-      
-      // Update your Auth Context
+
+      // Update your Auth Context (auth cookie is already set by backend)
       login(user);
+
 
       // Navigate based on user role
       if (user.role === 'ADMIN') {

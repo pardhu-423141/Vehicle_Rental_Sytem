@@ -1,9 +1,7 @@
-# Vehicle Controller Error Fix TODO
+# TODO - Fix login
 
-- [x] Step 1: Fixed catch types in vehicleController.ts
-- [x] Step 1b: Fixed prisma.Vehicle → prisma.vehicle casing
-- [x] Step 2: Verified no TypeScript errors (VSCode shows none)
-- [x] Step 3: Prisma client up-to-date (types work)
-- [x] Step 4: Ready for npm run dev
-- [x] Step 5: Complete
+- [x] Replace backend `vehicle-rental-backend/src/routes/auth.routes.ts` with correct auth endpoints wired to `controllers/auth.controller.ts`.
+- [x] Update frontend `vehicle-rental-frontend/src/pages/Login.tsx` to stop reading `res.data.token` (cookie-based auth).
+
+- [ ] (Optional) Run a quick smoke test: login -> verify `auth_token` cookie is set -> call `/api/user/profile`.
 

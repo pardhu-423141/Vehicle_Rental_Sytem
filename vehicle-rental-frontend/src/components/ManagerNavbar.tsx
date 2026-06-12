@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Car, ArrowRightLeft, Wrench, Bell, LogOut } from 'lucide-react';
+import { Menu, X, Car, ArrowRightLeft, Wrench, Bell, LogOut, MessageSquareWarning } from 'lucide-react';
 import { useAuth } from '../context/AuthContext'; // Import context
 import toast from 'react-hot-toast';
 
@@ -17,6 +17,7 @@ export default function ManagerNavbar() {
     { name: 'My Fleet', path: '/manager/fleet', icon: Car },
     { name: 'Handovers & Returns', path: '/manager/operations', icon: ArrowRightLeft },
     { name: 'Service Inbox', path: '/manager/maintenance', icon: Wrench },
+    { name: 'Issue Inbox', path: '/manager/issues', icon: MessageSquareWarning },
   ];
 
   // Mock Notifications specific to Role 2.4 (Vehicle Manager)

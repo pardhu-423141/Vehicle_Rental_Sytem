@@ -44,6 +44,12 @@ model User {
   reviews   Review[]
 
   managedVehicles Vehicle[]
+
+  reportedIssues Issue[] @relation("ReportedByAdmin")
+
+  assignedIssues Issue[] @relation("AssignedToManager")
+
+  statusLogs VehicleStatusLog[]
 }
 
 enum VehicleType {
@@ -71,20 +77,22 @@ model Vehicle {
   seatingCapacity Int         @default(5)
   // ------------------
 
-  status        String    @default("Available") 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime? 
-  
-  bookings      Booking[]
-  reviews       Review[]
+  status    String    @default("Available")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  bookings Booking[]
+  reviews  Review[]
 
   // ⚡ ADD THESE TWO LINES:
   managerId String? // Optional, because a new car might not be assigned immediately
   manager   User?   @relation(fields: [managerId], references: [id])
 
   // ⚡ ADD THIS LINE:
-  maintenanceTasks MaintenanceTask[]
+  maintenanceTasks  MaintenanceTask[]
+  issues            Issue[]
+  vehicleStatusLogs VehicleStatusLog[]
 }
 
 model Booking {
@@ -100,6 +108,9 @@ model Booking {
   user    User     @relation(fields: [userId], references: [id])
   vehicle Vehicle  @relation(fields: [vehicleId], references: [id])
   payment Payment? // One-to-one relationship with Payment
+
+  handoverAt DateTime?
+  returnAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -177,6 +188,51 @@ model MaintenanceTask {
   status       String   @default("Pending") // Pending, In Progress, Resolved
   reportedDate DateTime @default(now())
 
+  resolvedAt DateTime?
+
   vehicleId String
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+}
+
+enum IssueStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model Issue {
+  id String @id @default(uuid())
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+
+  reportedByAdminId String
+  reportedByAdmin   User   @relation("ReportedByAdmin", fields: [reportedByAdminId], references: [id])
+
+  assignedManagerId String
+  assignedManager   User   @relation("AssignedToManager", fields: [assignedManagerId], references: [id])
+
+  title       String
+  description String
+  response    String?
+
+  status IssueStatus @default(OPEN)
+
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+}
+
+model VehicleStatusLog {
+  id String @id @default(uuid())
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+
+  changedBy String
+  changer   User   @relation(fields: [changedBy], references: [id])
+
+  status String
+  reason String?
+
+  createdAt DateTime @default(now())
 }

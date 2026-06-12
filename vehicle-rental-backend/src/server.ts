@@ -13,6 +13,9 @@ import adminRoutes from './routes/admin.routes';
 import userRoutes from './routes/user.routes';   
 import userManagerRoutes from './routes/userManagerRoutes';
 import operationsRoutes from './routes/operationsRoutes'; // ✅ Imported perfectly
+import issueRoutes from './routes/issue.routes';
+
+
 
 // 2. Import Database Connection and Cron Tasks
 import './config/db';   // Ensures DB connection is tested on startup
@@ -49,8 +52,12 @@ app.use('/api/user-manager', userManagerRoutes);
 // ✅ NEW: Added the operations routes!
 app.use('/api/operations', operationsRoutes);
 
+// ✅ Issues routes
+app.use('/api/issues', issueRoutes);
+
 
 // 5. Global Error Handler (Optional but Recommended)
+
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error("Global Error:", err.stack);
   res.status(500).json({ message: "Something went wrong on the server" });

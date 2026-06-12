@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
-import { PrismaClient } from '@prisma/client';
 
 // 1. GET ALL USERS (with Pagination)
 export const getAllUsers = async (req: Request, res: Response) => {
@@ -21,7 +20,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
           role: true,
           kycStatus: true,
           isVerified: true,
-          createdAt: true,
+          createdAt: true
         }
       }),
       db.user.count()
@@ -40,21 +39,19 @@ export const getAllUsers = async (req: Request, res: Response) => {
   }
 };
 
-// ⚡ NEW: GET ALL STAFF MEMBERS
+// 2. GET ALL STAFF MEMBERS
 export const getStaff = async (req: Request, res: Response) => {
   try {
     const staff = await db.user.findMany({
       where: {
-        role: {
-          in: ['ADMIN', 'VEHICLE_MANAGER', 'USER_MANAGER'] // Add or change roles as needed based on your schema
-        }
+        role: { in: ['ADMIN', 'VEHICLE_MANAGER', 'USER_MANAGER'] }
       },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
-        createdAt: true,
+        createdAt: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -66,10 +63,10 @@ export const getStaff = async (req: Request, res: Response) => {
   }
 };
 
-// 2. UPDATE USER ROLE (Promotion/Demotion)
+// 3. UPDATE USER ROLE
 export const updateUserRole = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { role } = req.body; // Expects USER, USER_MANAGER, VEHICLE_MANAGER, or ADMIN
+  const { role } = req.body;
   const validRoles = ['USER', 'USER_MANAGER', 'VEHICLE_MANAGER', 'ADMIN'];
 
   try {
@@ -89,37 +86,33 @@ export const updateUserRole = async (req: Request, res: Response) => {
   }
 };
 
-// 3. GET ADMIN DASHBOARD STATS
-// 3. GET ADMIN DASHBOARD STATS
+// 4. GET ADMIN DASHBOARD STATS
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
-    // 1. Fetch all counts in parallel for maximum speed
     const [
-      userCount, 
-      vehicleCount, 
+      userCount,
+      vehicleCount,
       totalVehicles,
-      pendingKYC, 
+      pendingKYC,
       activeBookings,
       totalBookings,
       pendingMaintenance
     ] = await Promise.all([
       db.user.count(),
-      db.vehicle.count({ where: { status: 'available', deletedAt: null } }), // Active
-      db.vehicle.count({ where: { deletedAt: null } }), // Total
+      db.vehicle.count({ where: { status: 'Available', deletedAt: null } }),
+      db.vehicle.count({ where: { deletedAt: null } }),
       db.user.count({ where: { kycStatus: 'PENDING' } }),
       db.booking.count({ where: { status: 'ONGOING' } }),
-      db.booking.count(), // Total lifetime bookings
-      db.maintenanceTask.count({ where: { status: 'Pending' } }) // Assuming 'Pending' based on your schema
+      db.booking.count(),
+      db.maintenanceTask.count({ where: { status: 'Pending' } })
     ]);
 
-    // 2. Calculate Total Revenue (Sum of all COMPLETED bookings)
     const revenueCalc = await db.booking.aggregate({
       _sum: { totalPrice: true },
       where: { status: 'COMPLETED' }
     });
     const totalRevenue = revenueCalc._sum.totalPrice || 0;
 
-    // ⚡ 3. Fetch the 5 most recent bookings with User and Vehicle info included
     const recentBookings = await db.booking.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
@@ -129,82 +122,71 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       }
     });
 
-    // 4. Send it all back in the structure React expects
     res.status(200).json({
       stats: {
         totalUsers: userCount,
         activeVehicles: vehicleCount,
-        totalVehicles: totalVehicles,
+        totalVehicles,
         pendingVerifications: pendingKYC,
         currentRentals: activeBookings,
-        totalBookings: totalBookings,
-        pendingMaintenance: pendingMaintenance,
-        totalRevenue: totalRevenue
+        totalBookings,
+        pendingMaintenance,
+        totalRevenue
       },
-      recentBookings: recentBookings // ⚡ This populates the table!
+      recentBookings
     });
-    
   } catch (error) {
     console.error("Dashboard Stats Error:", error);
     res.status(500).json({ message: "Failed to fetch dashboard stats" });
   }
 };
 
-// 4. BULK MAINTENANCE TOGGLE
+// 5. BULK MAINTENANCE TOGGLE
 export const toggleMaintenance = async (req: Request, res: Response) => {
-  const { vehicleIds, status } = req.body; 
+  const { vehicleIds, status } = req.body;
 
   try {
     const updated = await db.vehicle.updateMany({
-      where: {
-        id: { in: vehicleIds }
-      },
+      where: { id: { in: vehicleIds } },
       data: { status }
     });
 
-    res.status(200).json({ 
-      message: `Updated ${updated.count} vehicles to ${status}.` 
-    });
+    res.status(200).json({ message: `Updated ${updated.count} vehicles to ${status}.` });
   } catch (error) {
     res.status(500).json({ message: "Bulk update failed." });
   }
 };
 
-// 5. GET DELETED VEHICLES (Archive)
+// 6. GET DELETED VEHICLES (Archive)
 export const getVehicleArchive = async (req: Request, res: Response) => {
   try {
     const archived = await db.vehicle.findMany({
-      where: {
-        deletedAt: { not: null }
-      },
+      where: { deletedAt: { not: null } },
       orderBy: { deletedAt: 'desc' }
     });
     res.status(200).json(archived);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch archive." });
   }
-}
+};
 
-// 6. RESTORE VEHICLE (Undo Soft Delete)
+// 7. RESTORE VEHICLE
 export const restoreVehicle = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
     const restored = await db.vehicle.update({
       where: { id },
-      data: { 
-        deletedAt: null,
-        status: 'available' 
-      }
+      data: { deletedAt: null, status: 'Available' }
     });
 
     res.status(200).json({ message: "Vehicle restored to inventory.", restored });
   } catch (error) {
-    res.status(500).json({ message: "Restoration failed. Vehicle might not exist." });
+    res.status(500).json({ message: "Restoration failed." });
   }
 };
 
-// 7. GET ALL BOOKINGS (Global Oversight)
+// 8. GET ALL BOOKINGS
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
     const bookings = await db.booking.findMany({
@@ -220,56 +202,69 @@ export const getAllBookings = async (req: Request, res: Response) => {
   }
 };
 
-
-// 8. GET REVENUE REPORTS
+// 9. GET REVENUE REPORTS (improved monthly grouping)
 export const getRevenueReports = async (req: Request, res: Response) => {
   try {
-    const totalRevenue = await db.booking.aggregate({
+    const totalRevenueAgg = await db.booking.aggregate({
       _sum: { totalPrice: true },
       where: { status: 'COMPLETED' }
     });
+    const totalRevenue = totalRevenueAgg._sum.totalPrice || 0;
 
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const monthlyRevenue = await db.booking.groupBy({
-      by: ['createdAt'],
-      _sum: { totalPrice: true },
-      where: {
-        status: 'COMPLETED',
-        createdAt: { gte: sixMonthsAgo }
-      },
+    const completedBookings = await db.booking.findMany({
+      where: { status: 'COMPLETED' },
+      select: { totalPrice: true, createdAt: true },
+      orderBy: { createdAt: 'asc' }
     });
+
+    // Group by year-month manually
+    const monthlyMap: Record<string, number> = {};
+    for (const b of completedBookings) {
+      const key = `${b.createdAt.getFullYear()}-${String(b.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      monthlyMap[key] = (monthlyMap[key] || 0) + (b.totalPrice || 0);
+    }
+
+    const monthlyBreakdown = Object.entries(monthlyMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([month, revenue]) => ({ month, revenue }));
 
     const topVehicles = await db.booking.groupBy({
       by: ['vehicleId'],
       _sum: { totalPrice: true },
       _count: { id: true },
-      orderBy: {
-        _sum: { totalPrice: 'desc' }
-      },
+      orderBy: { _sum: { totalPrice: 'desc' } },
       take: 5,
       where: { status: 'COMPLETED' }
     });
 
-    const vehicleDetails = await Promise.all(
-      topVehicles.map(async (item: { vehicleId: any; _sum: { totalPrice: any; }; _count: { id: any; }; }) => {
+    const topPerformingVehicles = await Promise.all(
+      topVehicles.map(async (item) => {
         const vehicle = await db.vehicle.findUnique({
           where: { id: item.vehicleId },
-          select: { make: true, model: true }
+          select: { make: true, model: true, licensePlate: true }
         });
         return {
           ...vehicle,
-          totalEarned: item._sum.totalPrice,
+          totalEarned: item._sum.totalPrice || 0,
           rentalCount: item._count.id
         };
       })
     );
 
+    const bookingStatusBreakdown = await db.booking.groupBy({
+      by: ['status'],
+      _count: { id: true }
+    });
+
     res.status(200).json({
-      totalRevenue: totalRevenue._sum.totalPrice || 0,
-      monthlyBreakdown: monthlyRevenue,
-      topPerformingVehicles: vehicleDetails
+      totalRevenue,
+      monthlyBreakdown,
+      topPerformingVehicles,
+      bookingStatusBreakdown: bookingStatusBreakdown.map(s => ({
+        status: s.status,
+        count: s._count.id
+      }))
     });
   } catch (error) {
     console.error("Revenue report error:", error);
@@ -277,7 +272,7 @@ export const getRevenueReports = async (req: Request, res: Response) => {
   }
 };
 
-// 9. GET RECENT TRANSACTIONS
+// 10. GET RECENT TRANSACTIONS
 export const getRecentTransactions = async (req: Request, res: Response) => {
   try {
     const transactions = await db.booking.findMany({
@@ -298,33 +293,57 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
   }
 };
 
-const prisma = new PrismaClient();
-
+// 11. GET MAINTENANCE TASKS (Admin view)
 export const getMaintenanceTasks = async (req: Request, res: Response) => {
   try {
-    const vehicles = await prisma.vehicle.findMany({
-      where: {
-        status: "under maintenance",
-        deletedAt: null 
-      }
+    const tasks = await db.maintenanceTask.findMany({
+      where: { vehicle: { deletedAt: null } },
+      include: { vehicle: true },
+      orderBy: { reportedDate: 'desc' }
     });
-    res.json(vehicles);
+    res.status(200).json(tasks);
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
+// 12. RESOLVE MAINTENANCE (Admin shortcut - id is vehicle id for backward compatibility)
 export const resolveMaintenance = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params; 
-    
-    await prisma.vehicle.update({
-      where: { id: id },
-      data: { status: "Available" }
+    const { id } = req.params; // vehicle id
+
+    await db.vehicle.update({
+      where: { id },
+      data: { status: 'Available' }
     });
 
-    res.json({ message: "Vehicle restored to Available status" });
+    // Also mark any pending maintenance tasks for this vehicle as resolved
+    await db.maintenanceTask.updateMany({
+      where: { vehicleId: id, status: { not: 'Resolved' } },
+      data: { status: 'Resolved', resolvedAt: new Date() }
+    });
+
+    res.json({ message: "Vehicle restored to Available. Maintenance tasks resolved." });
   } catch (error) {
     res.status(500).json({ error: "Failed to resolve maintenance" });
+  }
+};
+
+// 13. GET VEHICLE STATUS LOGS
+export const getVehicleStatusLogs = async (req: Request, res: Response) => {
+  const { vehicleId } = req.params;
+  try {
+    const logs = await db.vehicleStatusLog.findMany({
+      where: vehicleId ? { vehicleId } : {},
+      include: {
+        vehicle: { select: { make: true, model: true, licensePlate: true } },
+        changer: { select: { name: true, role: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    res.status(200).json(logs);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch status logs." });
   }
 };
