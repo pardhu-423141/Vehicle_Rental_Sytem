@@ -24,6 +24,7 @@ interface Vehicle {
   type: 'TWO_WHEELER' | 'FOUR_SEATER' | 'FIVE_SEATER' | 'SEVEN_SEATER' | 'LUXURY';
   seatingCapacity: number;
   status: string;
+    manager?: { id: string; name: string } | null;
 }
 
 // Mapping from backend enum to UI-friendly labels and icons
@@ -49,6 +50,9 @@ export default function Marketplace() {
   const { user } = useAuth();
   const navigate = useNavigate(); // ⚡ ADDED
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');        
+const [minPrice, setMinPrice] = useState<number | ''>(''); 
+const [maxPrice, setMaxPrice] = useState<number | ''>(''); 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,13 +123,31 @@ export default function Marketplace() {
   }, [viewingVehicle]);
 
   // Filter vehicles based on selected category
-  const filteredVehicles = vehicles.filter(vehicle => {
-    if (selectedCategory === 'All') return true;
+ const filteredVehicles = vehicles.filter(vehicle => {
+  // Category filter
+  if (selectedCategory !== 'All') {
     const category = categories.find(c => c.id === selectedCategory);
-    if (!category) return false;
-    // Check if vehicle's type is in the category's allowed types
-    return category.types?.includes(vehicle.type);
-  });
+    if (!category?.types?.includes(vehicle.type)) return false;
+  }
+
+  // Keyword search (Task 9)
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      vehicle.make.toLowerCase().includes(q) ||
+      vehicle.model.toLowerCase().includes(q) ||
+      vehicle.fuelType.toLowerCase().includes(q) ||
+      vehicle.transmission.toLowerCase().includes(q) ||
+      vehicle.type.toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+  }
+
+  // Price range filter (Task 10)
+  if (minPrice !== '' && vehicle.rentalRate < minPrice) return false;
+  if (maxPrice !== '' && vehicle.rentalRate > maxPrice) return false;
+
+  return true;
+});
 
   const isBookingAllowed = kycStatus === 'APPROVED';
 
@@ -171,6 +193,46 @@ export default function Marketplace() {
           Select a category to browse our currently available vehicles.
         </p>
       </div>
+      {/* Search & Price Filters (Tasks 9, 10) */}
+<div className="flex flex-col md:flex-row gap-4 mb-8">
+  {/* Keyword Search */}
+  <div className="relative flex-1">
+    <input
+      type="text"
+      placeholder="Search by make, model, fuel type..."
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)}
+      className="w-full pl-4 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-gray-500 outline-none focus:border-blue-500/50 text-sm"
+    />
+  </div>
+
+  {/* Price Range */}
+  <div className="flex gap-2 items-center">
+    <input
+      type="number"
+      placeholder="Min ₹"
+      value={minPrice}
+      onChange={(e) => setMinPrice(e.target.value === '' ? '' : Number(e.target.value))}
+      className="w-28 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-gray-500 outline-none focus:border-blue-500/50 text-sm"
+    />
+    <span className="text-gray-500">—</span>
+    <input
+      type="number"
+      placeholder="Max ₹"
+      value={maxPrice}
+      onChange={(e) => setMaxPrice(e.target.value === '' ? '' : Number(e.target.value))}
+      className="w-28 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-gray-500 outline-none focus:border-blue-500/50 text-sm"
+    />
+    {(searchQuery || minPrice !== '' || maxPrice !== '') && (
+      <button
+        onClick={() => { setSearchQuery(''); setMinPrice(''); setMaxPrice(''); }}
+        className="px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl text-xs font-bold hover:bg-red-500/20 transition"
+      >
+        Clear
+      </button>
+    )}
+  </div>
+</div>
 
       {/* Category Buttons */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
@@ -266,13 +328,12 @@ export default function Marketplace() {
                     <span className="px-2 py-1 bg-white/5 rounded-full">{vehicle.licensePlate}</span>
                   </div>
 
-                  {/* Manager Info (placeholder) */}
-                  <div className="flex items-center gap-2 mt-auto pt-4 border-t border-white/5 text-xs text-gray-400">
-                    <UserCircle size={14} className="text-gray-500" />
-                    <span>
-                      Managed by: <span className="text-gray-300 font-medium">Fleet Team</span>
-                    </span>
-                  </div>
+                  
+                  {vehicle.manager && (
+  <p className="text-[11px] text-gray-500 mt-1">
+    Manager: <span className="text-gray-300">{vehicle.manager.name}</span>
+  </p>
+)}
 
                   {/* Booking Action */}
                   {isBookingAllowed ? (

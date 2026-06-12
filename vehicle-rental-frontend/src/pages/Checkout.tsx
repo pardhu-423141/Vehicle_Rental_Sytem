@@ -341,7 +341,7 @@ export default function Checkout() {
                     <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 z-10" size={18} />
                     <DatePicker
                       selected={pickupDate}
-                      onChange={(date) => setPickupDate(date)}
+                      onChange={(date:any) => setPickupDate(date)}
                       showTimeSelect
                       dateFormat="MMMM d, yyyy h:mm aa"
                       minDate={new Date()} 
@@ -359,7 +359,7 @@ export default function Checkout() {
                     <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 z-10" size={18} />
                     <DatePicker
                       selected={dropoffDate}
-                      onChange={(date) => setDropoffDate(date)}
+                      onChange={(date:any) => setDropoffDate(date)}
                       showTimeSelect
                       dateFormat="MMMM d, yyyy h:mm aa"
                       minDate={pickupDate || new Date()} 

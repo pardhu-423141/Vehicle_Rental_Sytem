@@ -185,7 +185,25 @@ export default function UserKYC() {
           <p className="text-sm text-red-200">
             <strong>Your previous submission was rejected.</strong> Please ensure the images are clear, well-lit, and match the entered ID number.
           </p>
+          {userData?.kycStatus === 'REJECTED' && (
+  <div className="mt-6 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl">
+    <div className="flex items-center gap-2 mb-2">
+      <AlertTriangle className="text-red-400" size={20} />
+      <h3 className="text-red-400 font-bold text-sm uppercase tracking-widest">KYC Rejected</h3>
+    </div>
+    <p className="text-gray-300 text-sm">
+      Your KYC was rejected. Please review the reason below and re-submit corrected documents.
+    </p>
+    {userData?.kycData?.rejectionReason && (
+      <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">Reason</p>
+        <p className="text-red-300 text-sm font-medium">{userData.kycData.rejectionReason}</p>
+      </div>
+    )}
+  </div>
+)}
         </div>
+        
       )}
 
       <div className="mb-8 text-center">
