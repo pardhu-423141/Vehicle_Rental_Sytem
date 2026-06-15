@@ -1,15 +1,13 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { db } from '../config/db';
 
 // 1. Get Dashboard Stats
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
-    const totalUsers = await prisma.user.count({ where: { role: 'USER' } });
-    const pendingKyc = await prisma.user.count({ where: { kycStatus: 'PENDING' } });
-    
-    const recentRequests = await prisma.user.findMany({
+    const totalUsers = await db.user.count({ where: { role: 'USER' } });
+    const pendingKyc = await db.user.count({ where: { kycStatus: 'PENDING' } });
+
+    const recentRequests = await db.user.findMany({
       where: { kycStatus: 'PENDING' },
       select: { id: true, name: true, kycStatus: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
@@ -26,9 +24,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 // 2. Get the full KYC Queue
 export const getKycQueue = async (req: Request, res: Response) => {
   try {
-    const queue = await prisma.user.findMany({
+    const queue = await db.user.findMany({
       where: { kycStatus: 'PENDING' },
-      include: { kycData: true } // Fetches their Aadhaar/DL info
+      include: { kycData: true }
     });
     res.json(queue);
   } catch (error) {
@@ -41,7 +39,7 @@ export const getKycQueue = async (req: Request, res: Response) => {
 export const approveKyc = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    await prisma.user.update({
+    await db.user.update({
       where: { id: userId },
       data: { kycStatus: 'APPROVED', isVerified: true }
     });
@@ -55,27 +53,28 @@ export const approveKyc = async (req: Request, res: Response) => {
 export const rejectKyc = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    await prisma.user.update({
+    await db.user.update({
       where: { id: userId },
       data: { kycStatus: 'REJECTED' }
     });
-    // Note: If you have an email service, you would trigger a "KYC Rejected" email here
     res.json({ message: "User KYC Rejected" });
   } catch (error) {
     res.status(500).json({ message: "Failed to reject KYC" });
   }
 };
+
+// 5. Get all users (USER role only)
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const users = await prisma.user.findMany({
+    const users = await db.user.findMany({
       where: { role: 'USER' },
-      select: { 
-        id: true, 
-        name: true, 
-        email: true, 
-        kycStatus: true, 
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        kycStatus: true,
         createdAt: true,
-        kycData: true // <--- ⚡ ADD THIS LINE SO WE GET THE IMAGES
+        kycData: true
       },
       orderBy: { createdAt: 'desc' }
     });

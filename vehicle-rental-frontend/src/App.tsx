@@ -7,6 +7,8 @@ import Layout from './components/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import AdminDashboard from './pages/AdminDashboard';
 import FleetManagement from './pages/FleetManagement';
 import UserManagement from './pages/UserManagement';
@@ -43,14 +45,16 @@ export default function App(): JSX.Element {
           <Route path="/" element={<Home />} />
 
           <Route element={<Layout />}>
-
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+            <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+            <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
             <Route path="/marketplace" element={<Marketplace />} />
 
             {/* ADMIN ONLY */}
             <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
               <Route path="/AdminDashboard" element={<AdminDashboard />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/fleet" element={<FleetManagement />} />
               <Route path="/admin/users" element={<UserManagement />} />
               <Route path="/admin/staff" element={<StaffManagement />} />
@@ -82,7 +86,6 @@ export default function App(): JSX.Element {
               <Route path="/history" element={<RideHistory />} />
               <Route path="/kyc" element={<UserKYC />} />
             </Route>
-
           </Route>
         </Routes>
       </AuthProvider>

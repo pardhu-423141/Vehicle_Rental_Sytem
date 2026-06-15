@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  ShieldCheck, ShieldAlert, Car, Clock, 
+import {
+  ShieldCheck, ShieldAlert, Car, Clock,
   Activity, ArrowRight, Loader2, FileWarning, Calendar, MapPin
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
 export default function UserDashboard() {
   const { user, logout } = useAuth();
-  const id = user?.id; 
+  const id = user?.id;
   const navigate = useNavigate();
-  
+
   const [userData, setUserData] = useState<any>(null);
   const [activeRides, setActiveRides] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,29 +20,26 @@ export default function UserDashboard() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        
+
         const [profileRes, bookingsRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/user/profile`, { withCredentials: true }),
-          axios.get(`http://localhost:5000/api/bookings/my-bookings`, { withCredentials: true }).catch(() => ({ data: [] }))
+          api.get('/user/profile'),
+          api.get('/bookings/my-bookings').catch(() => ({ data: [] }))
         ]);
-        
+
         setUserData(profileRes.data);
 
-        // ⚡ EXACT SCHEMA MATCH: Filter for rides using your specific Prisma Enum
         const allBookings = bookingsRes.data || [];
-        const activeStatuses = ['PENDING', 'CONFIRMED', 'ONGOING']; 
-        
-        const currentRides = allBookings.filter((booking: any) => 
+        const activeStatuses = ['PENDING', 'CONFIRMED', 'ONGOING'];
+
+        const currentRides = allBookings.filter((booking: any) =>
           activeStatuses.includes(booking.status?.toUpperCase())
         );
-        
-        setActiveRides(currentRides);
 
+        setActiveRides(currentRides);
       } catch (err: any) {
         console.error('Dashboard Data Fetch Failed:', err);
-
         if (err.response?.status === 401) {
-          if (logout) logout(); 
+          if (logout) logout();
           navigate('/login', { replace: true });
         }
       } finally {
@@ -51,9 +48,9 @@ export default function UserDashboard() {
     };
 
     if (!id) {
-        navigate('/login', { replace: true });
+      navigate('/login', { replace: true });
     } else {
-        fetchDashboardData();
+      fetchDashboardData();
     }
   }, [id, navigate, logout]);
 
@@ -61,7 +58,7 @@ export default function UserDashboard() {
 
   const getKycUI = () => {
     const status = actualUser?.kycStatus?.toUpperCase() || 'INCOMPLETE';
-    
+
     switch (status) {
       case 'APPROVED':
         return {
@@ -93,13 +90,13 @@ export default function UserDashboard() {
           iconStyle: 'bg-red-500/10 border-red-500/20 text-red-400',
           Icon: FileWarning,
           title: 'Verification Rejected',
-          desc: 'There was an issue verifying your documents. Please review the requirements and re-submit.',
+          desc: 'There was an issue verifying your documents. Please review and re-submit.',
           btnStyle: 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/30',
           btnText: 'Re-Submit KYC',
           btnIcon: ArrowRight,
           btnLink: '/kyc'
         };
-      default: 
+      default:
         return {
           glow: 'bg-orange-500/20',
           iconStyle: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
@@ -117,11 +114,11 @@ export default function UserDashboard() {
   const getRideStatusStyle = (status: string) => {
     switch (status?.toUpperCase()) {
       case 'ONGOING':
-        return 'bg-green-500/10 text-green-400 border-green-500/30 text-green-400'; 
+        return 'bg-green-500/10 text-green-400 border-green-500/30';
       case 'CONFIRMED':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/30 text-blue-400'; 
-      default: // PENDING
-        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 text-yellow-400'; 
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+      default:
+        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
     }
   };
 
@@ -138,10 +135,10 @@ export default function UserDashboard() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 animate-in fade-in slide-in-from-bottom-4 duration-700 pt-8 pb-12">
-      
+
       <div className="mb-10">
         <h1 className="text-4xl font-black text-white tracking-tighter">
-            Welcome, <span className="text-blue-400">{actualUser?.name || 'Explorer'}</span>
+          Welcome, <span className="text-blue-400">{actualUser?.name || 'Explorer'}</span>
         </h1>
         <p className="text-gray-400 mt-2 text-sm font-medium">Manage your fleet access and tracking stats.</p>
       </div>
@@ -157,14 +154,12 @@ export default function UserDashboard() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white mb-1">{kycUI.title}</h2>
-                <p className="text-sm text-gray-400 max-w-sm leading-relaxed">
-                  {kycUI.desc}
-                </p>
+                <p className="text-sm text-gray-400 max-w-sm leading-relaxed">{kycUI.desc}</p>
               </div>
             </div>
 
-            <Link 
-              to={kycUI.btnLink} 
+            <Link
+              to={kycUI.btnLink}
               className={`px-6 py-4 font-black rounded-2xl transition-all transform hover:scale-[1.02] active:scale-95 flex items-center gap-2 whitespace-nowrap text-xs uppercase tracking-widest ${kycUI.btnStyle}`}
             >
               {kycUI.btnText} <kycUI.btnIcon size={18} />
@@ -176,18 +171,15 @@ export default function UserDashboard() {
       <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.4em] mb-6 flex items-center gap-3">
         <Activity className="text-blue-500" size={14} /> Mission Status: Active Rides
       </h3>
-      
-      {/* ⚡ DYNAMIC ACTIVE RIDES SECTION */}
+
       {activeRides.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {activeRides.map((ride) => (
             <div key={ride.id} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-xl relative overflow-hidden group hover:border-blue-500/40 transition-colors flex flex-col">
-              
-              {/* ⚡ THE CAR IMAGE HEADER */}
               <div className="w-full h-48 rounded-2xl overflow-hidden mb-5 relative bg-black/40 shrink-0">
-                <img 
-                  src={ride.vehicle?.image || ride.vehicle?.imageUrl || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf'} 
-                  alt={ride.vehicle?.name || `${ride.vehicle?.make} ${ride.vehicle?.model}`} 
+                <img
+                  src={ride.vehicle?.image || ride.vehicle?.imageUrl || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf'}
+                  alt={ride.vehicle?.name || `${ride.vehicle?.make} ${ride.vehicle?.model}`}
                   className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
                 />
                 <div className="absolute top-3 left-3">
@@ -197,9 +189,8 @@ export default function UserDashboard() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="relative z-10 flex-1 flex flex-col px-1">
-                {/* ⚡ CAR NAME AND PLATE */}
                 <div>
                   <h3 className="text-2xl font-bold text-white truncate">
                     {ride.vehicle?.name || `${ride.vehicle?.make} ${ride.vehicle?.model}`}
@@ -210,11 +201,11 @@ export default function UserDashboard() {
                 <div className="space-y-3 mt-6">
                   <div className="flex items-center gap-3 text-sm text-gray-300">
                     <Calendar size={16} className="text-gray-500" />
-                    <span>From: {new Date(ride.startDate).toLocaleDateString()} at {new Date(ride.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    <span>From: {new Date(ride.startDate).toLocaleDateString()}</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm text-gray-300">
                     <MapPin size={16} className="text-gray-500" />
-                    <span>Until: {new Date(ride.endDate).toLocaleDateString()} at {new Date(ride.endDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    <span>Until: {new Date(ride.endDate).toLocaleDateString()}</span>
                   </div>
                 </div>
 
@@ -222,7 +213,7 @@ export default function UserDashboard() {
                   <span className="text-[10px] text-gray-500 font-mono" title={ride.id}>
                     ID: {ride.id.split('-')[0].toUpperCase()}
                   </span>
-                  <Link to={`/history`} className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+                  <Link to="/history" className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
                     View Details <ArrowRight size={14} />
                   </Link>
                 </div>
@@ -231,16 +222,12 @@ export default function UserDashboard() {
           ))}
         </div>
       ) : (
-        /* ⚡ NEW SLEEK EMPTY STATE WITH IMAGE */
         <div className="bg-gradient-to-b from-white/5 to-transparent border border-white/10 rounded-[2.5rem] p-8 md:p-16 flex flex-col items-center justify-center text-center relative overflow-hidden group shadow-2xl">
-          
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-lg opacity-20 pointer-events-none">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-blue-500/30 blur-[100px] rounded-full" />
           </div>
 
           <div className="relative z-10 flex flex-col items-center">
-            
-            {/* Visual Header Image */}
             <div className="w-56 h-36 mb-8 relative rounded-2xl overflow-hidden shadow-2xl border border-white/10">
               <img
                 src="https://images.unsplash.com/photo-1503376712341-a6fa46c4f51e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
@@ -252,28 +239,21 @@ export default function UserDashboard() {
 
             <h4 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">Ready for your next adventure?</h4>
             <p className="text-gray-400 mb-10 max-w-md text-sm leading-relaxed">
-              You don't have any upcoming or active trips. Browse our premium fleet and book the perfect vehicle for your journey today.
+              You don't have any upcoming or active trips. Browse our premium fleet and book the perfect vehicle.
             </p>
-            
+
             {actualUser?.kycStatus?.toUpperCase() === 'APPROVED' ? (
-              <Link 
-                to="/marketplace" 
-                className="px-8 py-4 bg-blue-600 text-white text-sm font-bold rounded-2xl hover:bg-blue-700 transition shadow-lg shadow-blue-900/30 flex items-center gap-2 transform active:scale-95"
-              >
+              <Link to="/marketplace" className="px-8 py-4 bg-blue-600 text-white text-sm font-bold rounded-2xl hover:bg-blue-700 transition shadow-lg shadow-blue-900/30 flex items-center gap-2">
                 Book Your Ride <ArrowRight size={18} />
               </Link>
             ) : (
-              <Link 
-                to="/kyc" 
-                className="px-8 py-4 bg-orange-600/20 text-orange-400 border border-orange-500/30 text-sm font-bold rounded-2xl hover:bg-orange-600/30 transition flex items-center gap-2 transform active:scale-95"
-              >
+              <Link to="/kyc" className="px-8 py-4 bg-orange-600/20 text-orange-400 border border-orange-500/30 text-sm font-bold rounded-2xl hover:bg-orange-600/30 transition flex items-center gap-2">
                 <ShieldAlert size={18} /> Complete KYC to Book
               </Link>
             )}
           </div>
         </div>
       )}
-
     </div>
   );
 }

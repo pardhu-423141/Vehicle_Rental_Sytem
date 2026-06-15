@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role, IssueStatus } from '@prisma/client';
+import { Role, IssueStatus } from '@prisma/client';
+import { db } from '../config/db';
 import nodemailer from 'nodemailer';
-
-const prisma = new PrismaClient();
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -20,12 +19,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-const sendIssueEmail = async (
-  toEmail: string,
-  toName: string,
-  subject: string,
-  bodyHtml: string
-) => {
+const sendIssueEmail = async (toEmail: string, toName: string, subject: string, bodyHtml: string) => {
   try {
     await transporter.sendMail({
       from: '"DriveAdmin System" <noreply@rentalsystem.com>',
@@ -45,14 +39,14 @@ export const createIssue = async (req: AuthenticatedRequest, res: Response) => {
 
   try {
     const [vehicle, manager] = await Promise.all([
-      prisma.vehicle.findUnique({ where: { id: vehicleId }, select: { make: true, model: true, licensePlate: true } }),
-      prisma.user.findUnique({ where: { id: assignedManagerId }, select: { name: true, email: true } })
+      db.vehicle.findUnique({ where: { id: vehicleId }, select: { make: true, model: true, licensePlate: true } }),
+      db.user.findUnique({ where: { id: assignedManagerId }, select: { name: true, email: true } })
     ]);
 
     if (!vehicle) return res.status(404).json({ message: "Vehicle not found." });
     if (!manager) return res.status(404).json({ message: "Manager not found." });
 
-    const issue = await prisma.issue.create({
+    const issue = await db.issue.create({
       data: {
         title,
         description,
@@ -72,20 +66,7 @@ export const createIssue = async (req: AuthenticatedRequest, res: Response) => {
       manager.email,
       manager.name,
       `[Action Required] New Issue: ${title}`,
-      `
-        <div style="font-family: sans-serif; max-width: 600px;">
-          <h2 style="color: #ef4444;">New Issue Assigned to You</h2>
-          <p>Hello <strong>${manager.name}</strong>,</p>
-          <p>A new issue has been raised for a vehicle under your management:</p>
-          <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
-            <tr><td style="padding:8px; font-weight:bold; color:#666;">Issue</td><td style="padding:8px;">${title}</td></tr>
-            <tr><td style="padding:8px; font-weight:bold; color:#666;">Vehicle</td><td style="padding:8px;">${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})</td></tr>
-            <tr><td style="padding:8px; font-weight:bold; color:#666;">Details</td><td style="padding:8px;">${description}</td></tr>
-          </table>
-          <p>Please log in to your dashboard and acknowledge this issue as soon as possible.</p>
-          <p style="color:#999; font-size:12px;">This is an automated notification from DriveAdmin System.</p>
-        </div>
-      `
+      `<div style="font-family:sans-serif;max-width:600px;"><h2 style="color:#ef4444;">New Issue Assigned</h2><p>Hello <strong>${manager.name}</strong>,</p><p>Issue: <strong>${title}</strong></p><p>Vehicle: ${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})</p><p>Details: ${description}</p></div>`
     );
 
     res.status(201).json(issue);
@@ -95,7 +76,7 @@ export const createIssue = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-// 2. GET ALL ISSUES (Admin view — all issues)
+// 2. GET ALL ISSUES (Admin view)
 export const getAllIssues = async (req: AuthenticatedRequest, res: Response) => {
   const { status, vehicleId } = req.query;
 
@@ -104,7 +85,7 @@ export const getAllIssues = async (req: AuthenticatedRequest, res: Response) => 
     if (status) where.status = status as IssueStatus;
     if (vehicleId) where.vehicleId = vehicleId as string;
 
-    const issues = await prisma.issue.findMany({
+    const issues = await db.issue.findMany({
       where,
       include: {
         vehicle: { select: { make: true, model: true, licensePlate: true } },
@@ -121,12 +102,12 @@ export const getAllIssues = async (req: AuthenticatedRequest, res: Response) => 
   }
 };
 
-// 3. GET ISSUES FOR MANAGER (Manager's inbox)
+// 3. GET ISSUES FOR MANAGER
 export const getManagerIssues = async (req: AuthenticatedRequest, res: Response) => {
   const managerId = req.user?.id;
 
   try {
-    const issues = await prisma.issue.findMany({
+    const issues = await db.issue.findMany({
       where: { assignedManagerId: managerId },
       include: {
         vehicle: { select: { make: true, model: true, licensePlate: true } },
@@ -149,7 +130,7 @@ export const updateIssue = async (req: AuthenticatedRequest, res: Response) => {
   const managerId = req.user?.id;
 
   try {
-    const issue = await prisma.issue.findUnique({
+    const issue = await db.issue.findUnique({
       where: { id },
       include: {
         reportedByAdmin: { select: { name: true, email: true } },
@@ -163,7 +144,7 @@ export const updateIssue = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(403).json({ message: "You are not authorized to update this issue." });
     }
 
-    const updated = await prisma.issue.update({
+    const updated = await db.issue.update({
       where: { id },
       data: {
         status: status as IssueStatus,
@@ -181,21 +162,7 @@ export const updateIssue = async (req: AuthenticatedRequest, res: Response) => {
         issue.reportedByAdmin.email,
         issue.reportedByAdmin.name,
         `Issue ${status === IssueStatus.RESOLVED ? 'Resolved' : 'Acknowledged'}: ${issue.title}`,
-        `
-          <div style="font-family: sans-serif; max-width: 600px;">
-            <h2 style="color: ${status === IssueStatus.RESOLVED ? '#22c55e' : '#3b82f6'};">
-              Issue ${status === IssueStatus.RESOLVED ? 'Resolved' : 'Acknowledged'}
-            </h2>
-            <p>Hello <strong>${issue.reportedByAdmin.name}</strong>,</p>
-            <p>The manager has updated the status of your issue:</p>
-            <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
-              <tr><td style="padding:8px; font-weight:bold; color:#666;">Issue</td><td style="padding:8px;">${issue.title}</td></tr>
-              <tr><td style="padding:8px; font-weight:bold; color:#666;">Vehicle</td><td style="padding:8px;">${issue.vehicle.make} ${issue.vehicle.model} (${issue.vehicle.licensePlate})</td></tr>
-              <tr><td style="padding:8px; font-weight:bold; color:#666;">New Status</td><td style="padding:8px; font-weight:bold;">${status}</td></tr>
-              ${response ? `<tr><td style="padding:8px; font-weight:bold; color:#666;">Manager Response</td><td style="padding:8px;">${response}</td></tr>` : ''}
-            </table>
-          </div>
-        `
+        `<div style="font-family:sans-serif;"><h2>Issue ${status}</h2><p>Issue: ${issue.title}</p><p>Vehicle: ${issue.vehicle.make} ${issue.vehicle.model}</p>${response ? `<p>Manager response: ${response}</p>` : ''}</div>`
       );
     }
 
@@ -211,7 +178,7 @@ export const deleteIssue = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
 
   try {
-    await prisma.issue.delete({ where: { id } });
+    await db.issue.delete({ where: { id } });
     res.status(200).json({ message: "Issue deleted." });
   } catch (error) {
     console.error("Delete Issue Error:", error);

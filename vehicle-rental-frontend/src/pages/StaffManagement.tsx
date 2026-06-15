@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Mail, Shield, Wrench, UserCog, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import api from '../api/axios';
 import AddStaffModal from '../components/AddStaffModal';
 
 interface StaffMember {
@@ -22,16 +22,7 @@ export default function StaffManagement() {
   const fetchStaff = async () => {
     try {
       setLoading(true);
-      
-      // ⚡ FIX: Grab the token from localStorage
-      const token = localStorage.getItem('token');
-      
-      const { data } = await axios.get('http://localhost:5000/api/admin/staff', {
-        headers: {
-          Authorization: `Bearer ${token}` 
-        },
-        withCredentials: true
-      });
+      const { data } = await api.get('/admin/staff');
 
       let staffArray: any[] = [];
       if (Array.isArray(data)) staffArray = data;
@@ -41,7 +32,6 @@ export default function StaffManagement() {
       const mappedStaff: StaffMember[] = staffArray.map((s: any) => {
         const rawRole = (s.role || '').toUpperCase();
         const role = rawRole.includes('USER') ? 'User Manager' : 'Vehicle Manager';
-
         return {
           id: s._id || s.id,
           name: s.name || s.firstName || 'Unknown Staff',
@@ -62,11 +52,9 @@ export default function StaffManagement() {
     }
   };
 
-  useEffect(() => {
-    fetchStaff();
-  }, []);
+  useEffect(() => { fetchStaff(); }, []);
 
-  const filteredStaff = staff.filter(member => 
+  const filteredStaff = staff.filter(member =>
     member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     member.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -82,28 +70,24 @@ export default function StaffManagement() {
 
   return (
     <div className="w-full max-w-7xl px-4 animate-in fade-in duration-700">
-      
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
         <div>
           <h1 className="text-4xl font-bold text-white tracking-tight">Staff Management</h1>
           <p className="text-gray-400 mt-2">Oversee roles and assign responsibility for KYC and Vehicles.</p>
         </div>
-        
-        <div className="flex items-center gap-3">
-            <button 
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 transition transform hover:scale-[1.05] active:scale-95"
-            >
-                <UserPlus size={20} /> Add Staff Member
-            </button>
-        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 transition transform hover:scale-[1.05] active:scale-95"
+        >
+          <UserPlus size={20} /> Add Staff Member
+        </button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search staff by name or email..."
             className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
             value={searchTerm}
@@ -113,7 +97,7 @@ export default function StaffManagement() {
       </div>
 
       <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl overflow-hidden mb-10">
-        <div className="overflow-x-auto custom-scrollbar">
+        <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-white/5 text-gray-400 text-[10px] uppercase tracking-[0.2em] border-b border-white/10">
@@ -142,19 +126,17 @@ export default function StaffManagement() {
                   </td>
 
                   <td className="px-6 py-5">
-                    <div className="flex items-center gap-2">
-                      {staffMember.role === 'User Manager' ? (
-                        <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                           <Shield size={14} className="text-purple-400" />
-                           <span className="text-[11px] font-bold text-purple-200">KYC Manager</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-                           <Wrench size={14} className="text-orange-400" />
-                           <span className="text-[11px] font-bold text-orange-200">Vehicle Manager</span>
-                        </div>
-                      )}
-                    </div>
+                    {staffMember.role === 'User Manager' ? (
+                      <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-lg w-fit">
+                        <Shield size={14} className="text-purple-400" />
+                        <span className="text-[11px] font-bold text-purple-200">KYC Manager</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-lg w-fit">
+                        <Wrench size={14} className="text-orange-400" />
+                        <span className="text-[11px] font-bold text-orange-200">Vehicle Manager</span>
+                      </div>
+                    )}
                   </td>
 
                   <td className="px-6 py-5">
@@ -164,16 +146,16 @@ export default function StaffManagement() {
                         <span className="text-white">{staffMember.assignedTasks}</span>
                       </div>
                       <div className="w-32 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-1000 ${staffMember.role === 'User Manager' ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]' : 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]'}`} 
+                        <div
+                          className={`h-full rounded-full transition-all duration-1000 ${staffMember.role === 'User Manager' ? 'bg-purple-500' : 'bg-orange-500'}`}
                           style={{ width: `${Math.min((staffMember.assignedTasks / 15) * 100, 100)}%` }}
-                        ></div>
+                        />
                       </div>
                     </div>
                   </td>
 
                   <td className="px-6 py-5 text-center">
-                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border backdrop-blur-md bg-green-500/20 text-green-400 border-green-500/30">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border bg-green-500/20 text-green-400 border-green-500/30">
                       {staffMember.status}
                     </span>
                   </td>
@@ -190,10 +172,10 @@ export default function StaffManagement() {
         </div>
       </div>
 
-      <AddStaffModal 
-        isOpen={isModalOpen} 
+      <AddStaffModal
+        isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={() => fetchStaff()} 
+        onSuccess={() => fetchStaff()}
       />
     </div>
   );

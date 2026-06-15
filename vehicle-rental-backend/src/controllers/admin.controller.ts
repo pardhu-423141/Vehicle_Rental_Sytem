@@ -28,11 +28,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
 
     res.status(200).json({
       users,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit)
-      }
+      pagination: { total, page, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch users" });
@@ -43,19 +39,10 @@ export const getAllUsers = async (req: Request, res: Response) => {
 export const getStaff = async (req: Request, res: Response) => {
   try {
     const staff = await db.user.findMany({
-      where: {
-        role: { in: ['ADMIN', 'VEHICLE_MANAGER', 'USER_MANAGER'] }
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true
-      },
+      where: { role: { in: ['ADMIN', 'VEHICLE_MANAGER', 'USER_MANAGER'] } },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
       orderBy: { createdAt: 'desc' }
     });
-
     res.status(200).json(staff);
   } catch (error) {
     console.error("Fetch Staff Error:", error);
@@ -86,18 +73,32 @@ export const updateUserRole = async (req: Request, res: Response) => {
   }
 };
 
-// 4. GET ADMIN DASHBOARD STATS
+// 4. DEACTIVATE USER (sets isVerified: false)
+export const deactivateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.user.update({ where: { id }, data: { isVerified: false } });
+    res.status(200).json({ message: "User deactivated." });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to deactivate user." });
+  }
+};
+
+// 5. REACTIVATE USER (sets isVerified: true)
+export const reactivateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.user.update({ where: { id }, data: { isVerified: true } });
+    res.status(200).json({ message: "User reactivated." });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to reactivate user." });
+  }
+};
+
+// 6. GET ADMIN DASHBOARD STATS
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
-    const [
-      userCount,
-      vehicleCount,
-      totalVehicles,
-      pendingKYC,
-      activeBookings,
-      totalBookings,
-      pendingMaintenance
-    ] = await Promise.all([
+    const [userCount, vehicleCount, totalVehicles, pendingKYC, activeBookings, totalBookings, pendingMaintenance] = await Promise.all([
       db.user.count(),
       db.vehicle.count({ where: { status: 'Available', deletedAt: null } }),
       db.vehicle.count({ where: { deletedAt: null } }),
@@ -123,16 +124,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     });
 
     res.status(200).json({
-      stats: {
-        totalUsers: userCount,
-        activeVehicles: vehicleCount,
-        totalVehicles,
-        pendingVerifications: pendingKYC,
-        currentRentals: activeBookings,
-        totalBookings,
-        pendingMaintenance,
-        totalRevenue
-      },
+      stats: { totalUsers: userCount, activeVehicles: vehicleCount, totalVehicles, pendingVerifications: pendingKYC, currentRentals: activeBookings, totalBookings, pendingMaintenance, totalRevenue },
       recentBookings
     });
   } catch (error) {
@@ -141,23 +133,21 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   }
 };
 
-// 5. BULK MAINTENANCE TOGGLE
+// 7. BULK MAINTENANCE TOGGLE
 export const toggleMaintenance = async (req: Request, res: Response) => {
   const { vehicleIds, status } = req.body;
-
   try {
     const updated = await db.vehicle.updateMany({
       where: { id: { in: vehicleIds } },
       data: { status }
     });
-
     res.status(200).json({ message: `Updated ${updated.count} vehicles to ${status}.` });
   } catch (error) {
     res.status(500).json({ message: "Bulk update failed." });
   }
 };
 
-// 6. GET DELETED VEHICLES (Archive)
+// 8. GET DELETED VEHICLES (Archive)
 export const getVehicleArchive = async (req: Request, res: Response) => {
   try {
     const archived = await db.vehicle.findMany({
@@ -170,23 +160,21 @@ export const getVehicleArchive = async (req: Request, res: Response) => {
   }
 };
 
-// 7. RESTORE VEHICLE
+// 9. RESTORE VEHICLE
 export const restoreVehicle = async (req: Request, res: Response) => {
   const { id } = req.params;
-
   try {
     const restored = await db.vehicle.update({
       where: { id },
       data: { deletedAt: null, status: 'Available' }
     });
-
     res.status(200).json({ message: "Vehicle restored to inventory.", restored });
   } catch (error) {
     res.status(500).json({ message: "Restoration failed." });
   }
 };
 
-// 8. GET ALL BOOKINGS
+// 10. GET ALL BOOKINGS
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
     const bookings = await db.booking.findMany({
@@ -202,7 +190,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
   }
 };
 
-// 9. GET REVENUE REPORTS (improved monthly grouping)
+// 11. GET REVENUE REPORTS
 export const getRevenueReports = async (req: Request, res: Response) => {
   try {
     const totalRevenueAgg = await db.booking.aggregate({
@@ -217,7 +205,6 @@ export const getRevenueReports = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'asc' }
     });
 
-    // Group by year-month manually
     const monthlyMap: Record<string, number> = {};
     for (const b of completedBookings) {
       const key = `${b.createdAt.getFullYear()}-${String(b.createdAt.getMonth() + 1).padStart(2, '0')}`;
@@ -244,11 +231,7 @@ export const getRevenueReports = async (req: Request, res: Response) => {
           where: { id: item.vehicleId },
           select: { make: true, model: true, licensePlate: true }
         });
-        return {
-          ...vehicle,
-          totalEarned: item._sum.totalPrice || 0,
-          rentalCount: item._count.id
-        };
+        return { ...vehicle, totalEarned: item._sum.totalPrice || 0, rentalCount: item._count.id };
       })
     );
 
@@ -261,10 +244,7 @@ export const getRevenueReports = async (req: Request, res: Response) => {
       totalRevenue,
       monthlyBreakdown,
       topPerformingVehicles,
-      bookingStatusBreakdown: bookingStatusBreakdown.map(s => ({
-        status: s.status,
-        count: s._count.id
-      }))
+      bookingStatusBreakdown: bookingStatusBreakdown.map(s => ({ status: s.status, count: s._count.id }))
     });
   } catch (error) {
     console.error("Revenue report error:", error);
@@ -272,7 +252,7 @@ export const getRevenueReports = async (req: Request, res: Response) => {
   }
 };
 
-// 10. GET RECENT TRANSACTIONS
+// 12. GET RECENT TRANSACTIONS
 export const getRecentTransactions = async (req: Request, res: Response) => {
   try {
     const transactions = await db.booking.findMany({
@@ -293,7 +273,7 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
   }
 };
 
-// 11. GET MAINTENANCE TASKS (Admin view)
+// 13. GET MAINTENANCE TASKS (Admin view)
 export const getMaintenanceTasks = async (req: Request, res: Response) => {
   try {
     const tasks = await db.maintenanceTask.findMany({
@@ -307,29 +287,22 @@ export const getMaintenanceTasks = async (req: Request, res: Response) => {
   }
 };
 
-// 12. RESOLVE MAINTENANCE (Admin shortcut - id is vehicle id for backward compatibility)
+// 14. RESOLVE MAINTENANCE
 export const resolveMaintenance = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params; // vehicle id
-
-    await db.vehicle.update({
-      where: { id },
-      data: { status: 'Available' }
-    });
-
-    // Also mark any pending maintenance tasks for this vehicle as resolved
+    const { id } = req.params;
+    await db.vehicle.update({ where: { id }, data: { status: 'Available' } });
     await db.maintenanceTask.updateMany({
       where: { vehicleId: id, status: { not: 'Resolved' } },
       data: { status: 'Resolved', resolvedAt: new Date() }
     });
-
     res.json({ message: "Vehicle restored to Available. Maintenance tasks resolved." });
   } catch (error) {
     res.status(500).json({ error: "Failed to resolve maintenance" });
   }
 };
 
-// 13. GET VEHICLE STATUS LOGS
+// 15. GET VEHICLE STATUS LOGS
 export const getVehicleStatusLogs = async (req: Request, res: Response) => {
   const { vehicleId } = req.params;
   try {

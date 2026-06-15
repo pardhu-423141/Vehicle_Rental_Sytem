@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role, BookingStatus } from '@prisma/client';
+import { Role, BookingStatus } from '@prisma/client';
+import { db } from '../config/db';
 import { logVehicleStatus } from '../utils/vehicleStatusLogger';
-
-const prisma = new PrismaClient();
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -17,7 +16,8 @@ export const getOperationsQueue = async (req: AuthenticatedRequest, res: Respons
   const managerId = req.user?.id;
 
   try {
-    const handovers = await prisma.booking.findMany({
+    // TASK-01 FIX: handovers come from CONFIRMED bookings (not PENDING)
+    const handovers = await db.booking.findMany({
       where: {
         status: BookingStatus.CONFIRMED,
         vehicle: { managerId: managerId }
@@ -26,7 +26,7 @@ export const getOperationsQueue = async (req: AuthenticatedRequest, res: Respons
       orderBy: { startDate: 'asc' }
     });
 
-    const returns = await prisma.booking.findMany({
+    const returns = await db.booking.findMany({
       where: {
         status: BookingStatus.ONGOING,
         vehicle: { managerId: managerId }
@@ -48,26 +48,26 @@ export const processHandover = async (req: AuthenticatedRequest, res: Response) 
   const managerId = req.user?.id as string;
 
   try {
-    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    const booking = await db.booking.findUnique({ where: { id: bookingId } });
     if (!booking) return res.status(404).json({ error: "Booking not found" });
 
     const now = new Date();
 
-    await prisma.$transaction([
-      prisma.booking.update({
+    await db.$transaction([
+      db.booking.update({
         where: { id: bookingId },
         data: {
           status: BookingStatus.ONGOING,
           handoverAt: now
         }
       }),
-      prisma.vehicle.update({
+      db.vehicle.update({
         where: { id: booking.vehicleId },
         data: { status: 'In Use' }
       })
     ]);
 
-    await logVehicleStatus(prisma, {
+    await logVehicleStatus(db, {
       vehicleId: booking.vehicleId,
       status: 'In Use',
       changedBy: managerId,
@@ -88,21 +88,21 @@ export const processReturn = async (req: AuthenticatedRequest, res: Response) =>
   const managerId = req.user?.id as string;
 
   try {
-    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    const booking = await db.booking.findUnique({ where: { id: bookingId } });
     if (!booking) return res.status(404).json({ error: "Booking not found" });
 
     const now = new Date();
     const newVehicleStatus = condition === 'good' ? 'Available' : 'Under Maintenance';
 
     const operations: any[] = [
-      prisma.booking.update({
+      db.booking.update({
         where: { id: bookingId },
         data: {
           status: BookingStatus.COMPLETED,
           returnAt: now
         }
       }),
-      prisma.vehicle.update({
+      db.vehicle.update({
         where: { id: booking.vehicleId },
         data: { status: newVehicleStatus }
       })
@@ -110,7 +110,7 @@ export const processReturn = async (req: AuthenticatedRequest, res: Response) =>
 
     if (condition === 'maintenance' && reason) {
       operations.push(
-        prisma.maintenanceTask.create({
+        db.maintenanceTask.create({
           data: {
             issue: reason,
             vehicleId: booking.vehicleId,
@@ -120,9 +120,9 @@ export const processReturn = async (req: AuthenticatedRequest, res: Response) =>
       );
     }
 
-    await prisma.$transaction(operations);
+    await db.$transaction(operations);
 
-    await logVehicleStatus(prisma, {
+    await logVehicleStatus(db, {
       vehicleId: booking.vehicleId,
       status: newVehicleStatus,
       changedBy: managerId,
@@ -143,7 +143,7 @@ export const getMaintenanceTasks = async (req: AuthenticatedRequest, res: Respon
   const managerId = req.user?.id;
 
   try {
-    const tasks = await prisma.maintenanceTask.findMany({
+    const tasks = await db.maintenanceTask.findMany({
       where: { vehicle: { managerId: managerId } },
       include: { vehicle: true },
       orderBy: { reportedDate: 'desc' }
@@ -168,18 +168,18 @@ export const updateMaintenanceTask = async (req: AuthenticatedRequest, res: Resp
       updateData.resolvedAt = new Date();
     }
 
-    const task = await prisma.maintenanceTask.update({
+    const task = await db.maintenanceTask.update({
       where: { id: taskId },
       data: updateData
     });
 
     if (status === 'Resolved') {
-      await prisma.vehicle.update({
+      await db.vehicle.update({
         where: { id: task.vehicleId },
         data: { status: 'Available' }
       });
 
-      await logVehicleStatus(prisma, {
+      await logVehicleStatus(db, {
         vehicleId: task.vehicleId,
         status: 'Available',
         changedBy: managerId,
