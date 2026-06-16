@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Calendar, Clock, IndianRupee, ShieldCheck, 
-  CheckCircle2, Loader2, Gift, X, Ticket, Sparkles 
+import {
+  Calendar, Clock, IndianRupee, ShieldCheck, CheckCircle2,
+  Loader2, X, Ticket, Tag, ChevronDown, AlertCircle, Gift
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
@@ -10,400 +10,521 @@ import { useAuth } from '../context/AuthContext';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
-interface BookingRange {
-  startDate: string;
-  endDate: string;
-}
-
+interface BookingRange { startDate: string; endDate: string; }
 interface Vehicle {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  licensePlate: string;
-  color: string;
-  fuelType: string;
-  transmission: string;
-  rentalRate: number;
-  imageUrl: string | null;
-  type: string;
-  seatingCapacity: number;
-  status: string;
+  id: string; make: string; model: string; year: number;
+  rentalRate: number; imageUrl: string | null; type: string;
   bookings?: BookingRange[];
 }
+interface UserCoupon {
+  id: string; code: string; couponType: string;
+  discountType: 'PERCENT' | 'FIXED'; discountValue: number;
+  maxDiscount: number | null; minBookingAmount: number | null;
+  conditions: string | null; expiresAt: string | null;
+  status: string; savings?: number;
+}
 
-// --- Wheel Rewards Configuration ---
-const REWARDS = [
-  { id: 1, label: '10% OFF', desc: 'Valid 3 Months', code: 'SAVE10', color: '#BFA071' }, // Gold
-  { id: 2, label: 'No Luck', desc: 'Better luck next time', code: null, color: '#2A2D34' }, // Dark Gray
-  { id: 3, label: '5% OFF', desc: 'Valid 1 Month', code: 'TAKE5', color: '#00796B' }, // Teal
-  { id: 4, label: '7% OFF', desc: 'Valid 2 Months', code: 'DRIVE7', color: '#6A4C93' }, // Purple
-  { id: 5, label: 'No Luck', desc: 'Maybe next trip', code: null, color: '#2A2D34' }, // Dark Gray
-  { id: 6, label: '10% OFF', desc: 'Valid 3 Months', code: 'RENT10', color: '#BFA071' }, // Gold
-  { id: 7, label: '3% OFF', desc: 'Valid 1 Month', code: 'SAVE3', color: '#1A237E' }, // Navy
-  { id: 8, label: '5% OFF', desc: 'Valid 2 Months', code: 'RIDE5', color: '#6A4C93' }, // Purple
-];
+const discountLabel = (c: UserCoupon, amount?: number) => {
+  if (c.discountType === 'FIXED') return `₹${c.discountValue} OFF`;
+  const pct = `${c.discountValue}%${c.maxDiscount ? ` (up to ₹${c.maxDiscount})` : ''}`;
+  if (amount && amount > 0) {
+    const raw = (amount * c.discountValue) / 100;
+    const savings = c.maxDiscount ? Math.min(raw, c.maxDiscount) : raw;
+    return `${pct}  •  saves ₹${Math.round(savings)}`;
+  }
+  return pct;
+};
 
-// Generate conic-gradient string dynamically for the wheel background
-const wheelGradient = `conic-gradient(
-  ${REWARDS.map((r, i) => `${r.color} ${i * 45}deg ${(i + 1) * 45}deg`).join(', ')}
-)`;
+const formatExpiry = (date: string | null) => {
+  if (!date) return null;
+  const d = new Date(date);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
 export default function Checkout() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  
+  const couponModalRef = useRef<HTMLDivElement>(null);
+
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [pickupDate, setPickupDate] = useState<Date | null>(null);
   const [dropoffDate, setDropoffDate] = useState<Date | null>(null);
   const [totalDays, setTotalDays] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
-  // --- Spinner State ---
-  const [showSpinnerModal, setShowSpinnerModal] = useState(false);
-  const [isSpinning, setIsSpinning] = useState(false);
-  const [rotation, setRotation] = useState(0);
-  const [spinResult, setSpinResult] = useState<typeof REWARDS[0] | null>(null);
+  // Coupon
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState<UserCoupon[]>([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
 
-  const kycStatus = user?.kycStatus || null;
-  const isKycApproved = kycStatus === 'APPROVED';
+  // Booking confirmed modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [savedAmount, setSavedAmount] = useState(0);
 
-  // Fetch Vehicle
+  const kycApproved = user?.kycStatus === 'APPROVED';
+
+  // Fetch vehicle
   useEffect(() => {
-    const fetchVehicle = async () => {
-      if (!id) return;
-      try {
-        setLoading(true);
-        const res = await api.get(`/vehicles/${id}`);
-        setVehicle(res.data);
-        setError(null);
-      } catch (err: any) {
-        console.error('Failed to fetch vehicle:', err);
-        setError(err.response?.data?.message || 'Vehicle not found.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchVehicle();
+    if (!id) return;
+    api.get(`/vehicles/${id}`)
+      .then(r => { setVehicle(r.data); setLoading(false); })
+      .catch(e => { setError(e.response?.data?.message || 'Vehicle not found.'); setLoading(false); });
   }, [id]);
 
-  // Auth Protection
+  // Auth / KYC guard
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        toast.error('Please log in to continue.');
-        navigate('/login');
-      } else if (!isKycApproved) {
-        toast.error('Please complete KYC verification to access checkout.');
-        navigate('/kyc');
-      }
-    }
-  }, [authLoading, user, isKycApproved, navigate]);
+    if (authLoading) return;
+    if (!user) { toast.error('Please log in.'); navigate('/login'); }
+    else if (!kycApproved) { toast.error('KYC approval required.'); navigate('/kyc'); }
+  }, [authLoading, user, kycApproved, navigate]);
 
-  // Calculate Days
+  // Days calculation
   useEffect(() => {
-    if (pickupDate && dropoffDate) {
-      const start = pickupDate.getTime();
-      const end = dropoffDate.getTime();
-      if (end > start) {
-        const diffMs = end - start;
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        setTotalDays(diffDays > 0 ? diffDays : 1);
-      } else {
-        setTotalDays(0);
-      }
-    } else {
-      setTotalDays(0);
-    }
+    if (pickupDate && dropoffDate && dropoffDate > pickupDate) {
+      const days = Math.ceil(Math.abs(dropoffDate.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24));
+      setTotalDays(Math.max(days, 1));
+    } else setTotalDays(0);
   }, [pickupDate, dropoffDate]);
 
-  // Block unavailable dates
   const isDateAvailable = (date: Date) => {
-    if (!vehicle?.bookings || vehicle.bookings.length === 0) return true;
-    return !vehicle.bookings.some(booking => {
-      const start = new Date(booking.startDate);
-      const end = new Date(booking.endDate);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999); 
-      return date >= start && date <= end;
+    if (!vehicle?.bookings?.length) return true;
+    return !vehicle.bookings.some(b => {
+      const s = new Date(b.startDate); s.setHours(0, 0, 0, 0);
+      const e = new Date(b.endDate); e.setHours(23, 59, 59, 999);
+      return date >= s && date <= e;
     });
+  };
+
+  const baseCost = totalDays * (vehicle?.rentalRate || 0);
+  const taxes = Math.round(baseCost * 0.18);
+  const grossTotal = baseCost + taxes;
+  const discountAmt = appliedCoupon?.discount || 0;
+  const grandTotal = Math.max(0, grossTotal - discountAmt);
+
+  // Refetch eligible coupons when amount changes
+  useEffect(() => {
+    if (grossTotal > 0 && showCouponModal) fetchCoupons();
+  }, [grossTotal, showCouponModal]);
+
+  // Close modal on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (couponModalRef.current && !couponModalRef.current.contains(e.target as Node)) {
+        setShowCouponModal(false);
+      }
+    };
+    if (showCouponModal) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showCouponModal]);
+
+
+  const fetchCoupons = async () => {
+    setLoadingCoupons(true);
+    try {
+      const res = await api.get(`/coupons/eligible?amount=${grossTotal}`);
+      setAvailableCoupons(res.data || []);
+    } catch {
+      setAvailableCoupons([]);
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
+
+  const openCouponModal = async () => {
+    setShowCouponModal(true);
+    await fetchCoupons();
+  };
+
+  const handleApplyCoupon = async (code?: string) => {
+    const codeToUse = (code || couponInput).trim().toUpperCase();
+    if (!codeToUse) return;
+    setCouponError(null);
+    setValidating(true);
+    try {
+      const res = await api.post('/coupons/validate', { code: codeToUse, amount: grossTotal });
+      if (res.data.valid) {
+        setAppliedCoupon({ code: res.data.coupon.code, discount: res.data.discount });
+        setCouponInput(res.data.coupon.code);
+        setShowCouponModal(false);
+        toast.success(`Coupon applied! You save ₹${res.data.discount}`);
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Invalid coupon code.';
+      setCouponError(msg);
+      toast.error(msg);
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError(null);
   };
 
   const handleConfirmBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isKycApproved) {
-      toast.error('KYC not approved.');
-      return;
-    }
-    if (!pickupDate || !dropoffDate || totalDays <= 0) {
-      toast.error('Please select valid pickup and dropoff dates.');
-      return;
-    }
-
+    if (!pickupDate || !dropoffDate || totalDays <= 0) { toast.error('Please select valid dates.'); return; }
     setSubmitting(true);
     try {
-      await api.post('/bookings/', {
+      const res = await api.post('/bookings/', {
         vehicleId: id,
         startDate: pickupDate.toISOString(),
         endDate: dropoffDate.toISOString(),
+        couponCode: appliedCoupon?.code
       });
-      // Trigger Spinner Modal instead of instant redirect
-      setShowSpinnerModal(true);
+      setSavedAmount(res.data.discount || 0);
+      setShowConfirmModal(true);
     } catch (err: any) {
-      console.error('Booking failed:', err);
       toast.error(err.response?.data?.message || 'Booking failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // --- Wheel Spin Logic ---
-  const handleStartSpin = () => {
-    if (isSpinning) return;
-    setIsSpinning(true);
-
-    // 1. Pick a random winner
-    const winningIndex = Math.floor(Math.random() * REWARDS.length);
-    const winner = REWARDS[winningIndex];
-
-    // 2. Calculate rotation required to land on the winner.
-    // Each slice is 45 degrees. We want the center of the winning slice to face top (0 deg).
-    const sliceAngle = 360 / REWARDS.length;
-    const centerOffset = sliceAngle / 2;
-    const targetAngle = 360 - (winningIndex * sliceAngle + centerOffset);
-
-    // Add 5 extra full rotations for visual effect
-    const extraSpins = 360 * 5;
-    const finalRotation = rotation + extraSpins + targetAngle - (rotation % 360);
-
-    setRotation(finalRotation);
-
-    // 3. Wait for the CSS transition to finish (5 seconds) before showing result
-    setTimeout(() => {
-      setIsSpinning(false);
-      setSpinResult(winner);
-    }, 5000); 
-  };
-
-  const closeAndNavigate = () => {
-    setShowSpinnerModal(false);
-    navigate('/Userdashboard');
-  };
-
   if (authLoading || loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" size={48} /></div>;
   if (error || !vehicle) return <div className="text-center text-white py-20">Vehicle not found.</div>;
-  if (!isKycApproved) return <div className="text-center text-white py-20">KYC Required.</div>;
-
-  const baseCost = totalDays * vehicle.rentalRate;
-  const taxes = Math.round(baseCost * 0.18);
-  const finalTotal = baseCost + taxes;
+  if (!kycApproved) return null;
 
   return (
-    <div className="w-full max-w-6xl px-4 animate-in fade-in duration-700 relative pb-20">
-      {/* ⚡ Global CSS for DatePicker & Wheel Transition */}
-      <style>{`
-        .react-datepicker { display: flex !important; flex-direction: row !important; }
-        .react-datepicker__time-container { border-left: 1px solid rgba(255, 255, 255, 0.1) !important; }
-        .react-datepicker-popper { z-index: 40 !important; }
-        .wheel-spin { transition: transform 5s cubic-bezier(0.2, 0.8, 0.2, 1); }
-      `}</style>
+    <div className="w-full max-w-6xl px-4 pb-20 pt-8">
+<style>{`
+.react-datepicker{display:flex!important;flex-direction:row!important;}
+.react-datepicker-popper{z-index:2147483647!important;}
+.react-datepicker__portal{z-index:2147483647!important;}
+`}</style>
 
-      {/* --- Spinner Modal Overlay --- */}
-      {showSpinnerModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-[#1A1D21]/90 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full relative shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-500 overflow-hidden">
-            
-            {/* Close Button */}
-            {!isSpinning && spinResult && (
-              <button onClick={closeAndNavigate} className="absolute top-6 right-6 text-gray-500 hover:text-white transition bg-white/5 rounded-full p-2">
-                <X size={20} />
-              </button>
-            )}
-            
-            <div className="text-center mb-8 relative z-10">
-              <Gift className="mx-auto text-[#BFA071] mb-3 drop-shadow-[0_0_15px_rgba(191,160,113,0.5)] animate-bounce" size={48} />
-              <h2 className="text-3xl font-black text-white tracking-tight">Booking Confirmed!</h2>
-              <p className="text-gray-400 mt-2 font-medium">Spin the wheel for a special discount on your next ride.</p>
+      {/* ── BOOKING CONFIRMED MODAL ── */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="text-green-400" size={36} />
             </div>
+            <h2 className="text-3xl font-black text-white mb-2">Booking Confirmed!</h2>
+            <p className="text-gray-400 text-sm mb-2">Your vehicle has been reserved.</p>
 
-            {/* View State: Spinner OR Result Card */}
-            {!spinResult ? (
-              <div className="relative z-10">
-                {/* The Wheel Container */}
-                <div className="relative w-64 h-64 mx-auto mb-10 drop-shadow-[0_0_20px_rgba(0,0,0,0.6)]">
-                  {/* Wheel Pointer */}
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 drop-shadow-lg">
-                    <div className="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[24px] border-t-white"></div>
-                  </div>
-                  
-                  {/* The Wheel */}
-                  <div 
-                    className="w-full h-full rounded-full border-4 border-white/20 shadow-inner relative overflow-hidden wheel-spin"
-                    style={{ transform: `rotate(${rotation}deg)`, background: wheelGradient }}
-                  >
-                    {/* Render Text Labels inside the wheel */}
-                    {REWARDS.map((reward, i) => {
-                      const angle = i * 45 + 22.5; // Center of each slice
-                      return (
-                        <div 
-                          key={i} 
-                          className="absolute inset-0 flex items-start justify-center pt-3"
-                          style={{ transform: `rotate(${angle}deg)` }}
-                        >
-                          <span className="text-[11px] font-black text-white uppercase tracking-wider drop-shadow-md max-w-[60px] text-center leading-tight">
-                            {reward.label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {/* Center Peg */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full border-4 border-gray-800 shadow-xl z-10"></div>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={handleStartSpin} 
-                  disabled={isSpinning}
-                  className="w-full py-4 bg-gradient-to-r from-[#BFA071] to-[#e6c185] hover:opacity-90 text-black font-black text-lg rounded-2xl transition-all shadow-[0_0_20px_rgba(191,160,113,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSpinning ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="animate-spin" size={24} /> Spinning...
-                    </span>
-                  ) : (
-                    'SPIN TO WIN'
-                  )}
-                </button>
-              </div>
-            ) : (
-              // Result Card
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-8 text-center animate-in zoom-in duration-500 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#BFA071] to-transparent opacity-50"></div>
-                
-                {spinResult.code ? (
-                  <>
-                    <Sparkles className="mx-auto text-[#BFA071] mb-4" size={32} />
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">You Won</p>
-                    <p className="text-4xl font-black text-white mt-2 mb-1">{spinResult.label}</p>
-                    <p className="text-sm text-[#BFA071] font-medium">{spinResult.desc}</p>
-                    
-                    <div className="mt-6 bg-black/40 p-4 rounded-xl border border-dashed border-white/20 relative group cursor-pointer hover:bg-black/60 transition">
-                      <p className="text-xs text-gray-500 uppercase font-bold mb-1">Coupon Code</p>
-                      <div className="flex items-center justify-center gap-3">
-                        <Ticket size={20} className="text-[#BFA071]" />
-                        <span className="text-2xl font-mono font-bold text-white tracking-widest">{spinResult.code}</span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Aww, snap!</p>
-                    <p className="text-3xl font-black text-white mt-2 mb-2">No luck this time</p>
-                    <p className="text-gray-400">We still have great standard rates for you!</p>
-                  </>
-                )}
-                
-                <button 
-                  onClick={closeAndNavigate}
-                  className="mt-8 w-full py-4 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-all"
-                >
-                  Go to Dashboard
-                </button>
+            {savedAmount > 0 && (
+              <div className="my-6 p-4 bg-green-500/10 border border-green-500/20 rounded-2xl">
+                <p className="text-green-400 font-bold text-lg">🎉 You saved ₹{savedAmount}!</p>
+                <p className="text-green-300/70 text-xs mt-1">Coupon discount applied successfully</p>
               </div>
             )}
+
+            <div className="flex flex-col gap-3 mt-6">
+              <button
+                onClick={() => { setShowConfirmModal(false); navigate('/UserDashboard'); }}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition"
+              >
+                Go to Dashboard
+              </button>
+              <button
+                onClick={() => { setShowConfirmModal(false); navigate('/history'); }}
+                className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-300 font-medium rounded-xl transition text-sm"
+              >
+                View My Bookings
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* --- Main Checkout UI --- */}
-      <div className="mb-8 pt-8">
-        <h1 className="text-3xl font-bold text-white tracking-tight">Complete your Booking</h1>
-        <p className="text-gray-400 mt-2">Step 4: Select your duration and confirm.</p>
+      {/* ── COUPON MODAL ── */}
+      {showCouponModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+          <div ref={couponModalRef} className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-white/[0.02]">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Ticket className="text-amber-400" size={18} /> Available Coupons
+              </h3>
+              <button onClick={() => setShowCouponModal(false)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="max-h-[70vh] overflow-y-auto p-4 space-y-3">
+              {loadingCoupons ? (
+                <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-blue-400" size={28} /></div>
+              ) : availableCoupons.length === 0 ? (
+                <div className="py-14 text-center">
+                  <Gift size={40} className="mx-auto text-gray-600 mb-4" />
+                  <p className="text-gray-400 font-semibold">No eligible coupons</p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    {grossTotal === 0 ? 'Select dates first to see eligible coupons.' : 'No active coupons match this booking.'}
+                  </p>
+                </div>
+              ) : (
+                availableCoupons.map(c => {
+                  const expiry = formatExpiry(c.expiresAt);
+                  const isWelcome = c.couponType === 'WELCOME';
+                  return (
+                    <div key={c.id} className={`p-5 rounded-2xl border transition-all ${
+                      isWelcome
+                        ? 'bg-amber-500/5 border-amber-500/25 hover:border-amber-500/50'
+                        : 'bg-purple-500/5 border-purple-500/25 hover:border-purple-500/50'
+                    }`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          {/* Code + badge */}
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <code className={`text-lg font-mono font-black ${isWelcome ? 'text-amber-300' : 'text-purple-300'}`}>
+                              {c.code}
+                            </code>
+                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md border ${
+                              isWelcome ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                            }`}>
+                              {isWelcome ? '🎉 Welcome' : '⭐ Loyalty'}
+                            </span>
+                          </div>
+
+                          {/* Discount */}
+                          <p className="text-white font-bold text-base">
+                            {discountLabel(c, grossTotal)}
+                          </p>
+
+                          {/* Details grid */}
+                          <div className="mt-2 space-y-1 text-xs text-gray-400">
+                            {expiry && <p>📅 Expires: {expiry}</p>}
+                            {c.minBookingAmount && <p>💰 Min. booking: ₹{c.minBookingAmount}</p>}
+                            {c.conditions && <p className="text-gray-500 leading-relaxed mt-1.5 italic">"{c.conditions}"</p>}
+                          </div>
+                        </div>
+
+                        {/* Savings badge */}
+                        {c.savings != null && c.savings > 0 && (
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-green-400 font-black text-lg">-₹{c.savings}</p>
+                            <p className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">savings</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => handleApplyCoupon(c.code)}
+                        disabled={validating}
+                        className={`mt-4 w-full py-2.5 font-bold text-sm rounded-xl transition ${
+                          isWelcome
+                            ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30'
+                            : 'bg-purple-500/15 hover:bg-purple-500/25 text-purple-400 border border-purple-500/30'
+                        } disabled:opacity-50`}
+                      >
+                        {validating ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Apply Coupon'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MAIN PAGE ── */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white">Complete your Booking</h1>
+        <p className="text-gray-400 mt-1 text-sm">Select your rental dates and apply any discount coupons.</p>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
+
+        {/* Left */}
         <div className="flex-1 space-y-6">
+
+          {/* Date picker */}
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <Clock className="text-blue-400" size={20} /> Rental Duration
             </h2>
-
-            <form className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                <div className="space-y-2 flex flex-col">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Pick-up Date & Time</label>
-                  <div className="relative w-full">
-                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 z-10" size={18} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[
+                { label: 'Pick-up Date & Time', val: pickupDate, set: setPickupDate, min: new Date() },
+                { label: 'Drop-off Date & Time', val: dropoffDate, set: setDropoffDate, min: pickupDate || new Date() }
+              ].map(({ label, val, set, min }) => (
+                <div key={label} className="flex flex-col gap-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">{label}</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-3.5 text-gray-500 z-10" size={16} />
                     <DatePicker
-                      selected={pickupDate}
-                      onChange={(date:any) => setPickupDate(date)}
+                      selected={val}
+                      onChange={(d: any) => set(d)}
                       showTimeSelect
                       dateFormat="MMMM d, yyyy h:mm aa"
-                      minDate={new Date()} 
+                      minDate={min}
                       filterDate={isDateAvailable}
-                      placeholderText="Select pickup time"
-                      className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      placeholderText="Select date & time"
+                      className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       wrapperClassName="w-full"
                     />
                   </div>
                 </div>
-
-                <div className="space-y-2 flex flex-col">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Drop-off Date & Time</label>
-                  <div className="relative w-full">
-                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 z-10" size={18} />
-                    <DatePicker
-                      selected={dropoffDate}
-                      onChange={(date:any) => setDropoffDate(date)}
-                      showTimeSelect
-                      dateFormat="MMMM d, yyyy h:mm aa"
-                      minDate={pickupDate || new Date()} 
-                      filterDate={isDateAvailable}
-                      placeholderText="Select dropoff time"
-                      className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 transition"
-                      wrapperClassName="w-full"
-                    />
-                  </div>
-                </div>
-
-              </div>
-            </form>
+              ))}
+            </div>
           </div>
 
-          <div className="p-6 bg-green-500/10 border border-green-500/20 rounded-3xl flex items-center gap-4">
-            <ShieldCheck className="text-green-400 shrink-0" size={28} />
+          {/* ── COUPON INPUT SECTION ── */}
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
+            <h2 className="text-base font-bold text-white mb-5 flex items-center gap-2">
+              <Tag className="text-amber-400" size={17} /> Discount Coupon
+            </h2>
+
+            {!appliedCoupon ? (
+              <div className="space-y-4">
+                {/* Input row */}
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <Ticket className="absolute left-3.5 top-3.5 text-gray-500" size={15} />
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
+                      onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                      placeholder="Enter coupon code"
+                      className={`w-full pl-9 pr-4 py-3 bg-black/20 border rounded-xl text-white placeholder:text-gray-600 outline-none focus:ring-2 text-sm font-mono uppercase transition ${
+                        couponError ? 'border-red-500/50 focus:ring-red-500/40' : 'border-white/10 focus:ring-amber-500/40'
+                      }`}
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleApplyCoupon()}
+                    disabled={!couponInput.trim() || validating}
+                    className="px-5 py-3 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black font-bold rounded-xl transition text-sm disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {validating ? <Loader2 size={16} className="animate-spin" /> : 'Apply'}
+                  </button>
+                </div>
+
+                {/* Error */}
+                {couponError && (
+                  <div className="flex items-center gap-2 text-red-400 text-sm">
+                    <AlertCircle size={14} />
+                    <span>{couponError}</span>
+                  </div>
+                )}
+
+                {/* View available coupons link */}
+                <button
+                  onClick={openCouponModal}
+                  disabled={totalDays === 0}
+                  className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Gift size={14} />
+                  View Available Coupons
+                  <ChevronDown size={14} />
+                </button>
+                {totalDays === 0 && (
+                  <p className="text-[11px] text-gray-500">Select dates first to view eligible coupons.</p>
+                )}
+              </div>
+            ) : (
+              /* Applied state */
+              <div className="flex items-center justify-between p-4 bg-green-500/10 border border-green-500/25 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-green-500/15 border border-green-500/30 flex items-center justify-center">
+                    <CheckCircle2 className="text-green-400" size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <code className="text-white font-mono font-bold">{appliedCoupon.code}</code>
+                      <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded font-bold uppercase">Applied</span>
+                    </div>
+                    <p className="text-green-400 text-xs mt-0.5 font-semibold">You save ₹{appliedCoupon.discount}!</p>
+                  </div>
+                </div>
+                <button onClick={removeCoupon} className="text-gray-500 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-500/10">
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* KYC badge */}
+          <div className="p-5 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center gap-4">
+            <ShieldCheck className="text-green-400 shrink-0" size={22} />
             <div>
               <p className="text-sm font-bold text-white">Verified Account (KYC Approved)</p>
-              <p className="text-xs text-green-200/70">You are eligible to complete this booking.</p>
+              <p className="text-xs text-green-200/60">You're eligible to complete this booking.</p>
             </div>
           </div>
         </div>
 
-        <div className="w-full lg:w-[400px]">
+        {/* Right — Summary */}
+        <div className="w-full lg:w-[380px]">
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl sticky top-24">
             <h2 className="text-xl font-bold text-white mb-6">Booking Summary</h2>
-            <div className="space-y-4 mb-6 pb-6 border-b border-white/10 text-sm">
+
+            {vehicle.imageUrl && (
+              <div className="w-full h-36 rounded-2xl overflow-hidden mb-5">
+                <img src={vehicle.imageUrl} alt={`${vehicle.make} ${vehicle.model}`} className="w-full h-full object-cover" />
+              </div>
+            )}
+
+            <div className="space-y-3 text-sm pb-4 border-b border-white/10">
               <div className="flex justify-between text-gray-300">
                 <span>Vehicle</span>
-                <span className="font-medium text-white">{vehicle.make} {vehicle.model}</span>
+                <span className="font-semibold text-white">{vehicle.make} {vehicle.model}</span>
               </div>
               <div className="flex justify-between text-gray-300">
-                <span>Number of days</span>
-                <span>{totalDays}</span>
+                <span>Rate</span>
+                <span>₹{vehicle.rentalRate}/day</span>
               </div>
-              <div className="flex justify-between text-white font-medium mt-2 pt-4 border-t border-white/10">
-                <span>Total Amount</span>
-                <span className="flex items-center text-xl text-blue-400 font-bold">
-                  <IndianRupee size={18}/>{totalDays > 0 ? finalTotal : '0'}
-                </span>
+              <div className="flex justify-between text-gray-300">
+                <span>Days</span>
+                <span>{totalDays || '—'}</span>
               </div>
+              <div className="flex justify-between text-gray-300">
+                <span>Base amount</span>
+                <span>₹{baseCost.toFixed(0)}</span>
+              </div>
+              <div className="flex justify-between text-gray-300">
+                <span>GST (18%)</span>
+                <span>₹{taxes}</span>
+              </div>
+              {appliedCoupon && (
+                <div className="flex justify-between text-green-400 font-semibold">
+                  <span className="flex items-center gap-1.5">
+                    <Ticket size={12} /> Coupon Discount
+                  </span>
+                  <span>-₹{appliedCoupon.discount}</span>
+                </div>
+              )}
             </div>
-            
+
+            <div className="flex justify-between items-end mt-4 mb-6">
+              <span className="text-white font-bold">Total Amount</span>
+              <span className="text-2xl font-black text-blue-400 flex items-center gap-0.5">
+                <IndianRupee size={18} />{grandTotal > 0 ? grandTotal.toFixed(0) : '0'}
+              </span>
+            </div>
+
+            {/* Original vs final if coupon */}
+            {appliedCoupon && grossTotal > grandTotal && (
+              <div className="mb-4 p-3 bg-green-500/10 border border-green-500/15 rounded-xl text-center space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Original Price</span>
+                  <span className="text-gray-400 line-through">₹{grossTotal.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold">
+                  <span className="text-green-400">You Save</span>
+                  <span className="text-green-400">₹{appliedCoupon.discount}</span>
+                </div>
+                <div className="flex justify-between font-black">
+                  <span className="text-white">Final Amount</span>
+                  <span className="text-white">₹{grandTotal.toFixed(0)}</span>
+                </div>
+              </div>
+            )}
+
             <button
               onClick={handleConfirmBooking}
               disabled={totalDays <= 0 || submitting}
@@ -414,7 +535,7 @@ export default function Checkout() {
               }`}
             >
               {submitting ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
-              {submitting ? 'Processing...' : 'Confirm & Pay'}
+              {submitting ? 'Processing...' : 'Confirm & Book'}
             </button>
           </div>
         </div>

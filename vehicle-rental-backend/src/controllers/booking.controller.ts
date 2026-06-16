@@ -1,77 +1,139 @@
 import { Response } from 'express';
 import { db } from '../config/db';
+import { notifyUser } from '../utils/socket';
+import { calcDiscount } from './coupon.controller';
+import { CouponType } from '@prisma/client';
 
-// 1. CREATE A NEW BOOKING
+const notifyManagerOfHandover = async (vehicleId: string, bookingId: string) => {
+  try {
+    const vehicle = await db.vehicle.findUnique({
+      where: { id: vehicleId },
+      include: { manager: true }
+    });
+    if (vehicle?.managerId) {
+      notifyUser(vehicle.managerId, 'handover:required', {
+        type: 'handover',
+        title: 'Handover Required',
+        message: `Booking confirmed for ${vehicle.make} ${vehicle.model} (${vehicle.licensePlate}). Customer is expecting key handover.`,
+        bookingId,
+        vehicleId,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (err) {
+    console.error('Notify manager error:', err);
+  }
+};
+
+// ─── 1. CREATE BOOKING ────────────────────────────────────────────────────────
 export const createBooking = async (req: any, res: Response) => {
-  const { vehicleId, startDate, endDate } = req.body;
+  const { vehicleId, startDate, endDate, couponCode } = req.body;
   const userId = req.user?.id;
 
   try {
-    const vehicle = await db.vehicle.findUnique({
+    const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId, deletedAt: null } });
+    if (!vehicle) return res.status(404).json({ message: 'Vehicle not found or unavailable.' });
+
+    const overlapping = await db.booking.findFirst({
       where: {
-        id: vehicleId,
-        deletedAt: null
+        vehicleId,
+        status: { in: ['CONFIRMED', 'ONGOING'] },
+        OR: [{ startDate: { lte: new Date(endDate) }, endDate: { gte: new Date(startDate) } }]
       }
     });
-
-    if (!vehicle) {
-      return res.status(404).json({ message: "Vehicle not found or no longer available." });
-    }
-
-    const overlappingBooking = await db.booking.findFirst({
-      where: {
-        vehicleId: vehicleId,
-        status: { in: ['CONFIRMED', 'ONGOING'] },
-        OR: [
-          {
-            startDate: { lte: new Date(endDate) },
-            endDate: { gte: new Date(startDate) },
-          },
-        ],
-      },
-    });
-
-    if (overlappingBooking) {
-      return res.status(400).json({ message: "Vehicle is already booked for these dates." });
-    }
+    if (overlapping) return res.status(400).json({ message: 'Vehicle already booked for these dates.' });
 
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-    const totalPrice = diffDays * vehicle.rentalRate;
+    const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 1;
+    const baseCost = diffDays * vehicle.rentalRate;
+    const taxes = Math.round(baseCost * 0.18);
+    const grossTotal = baseCost + taxes;
 
-    const newBooking = await db.booking.create({
+    // ── Coupon validation ──
+    let discount = 0;
+    let appliedCouponId: string | null = null;
+    let appliedCouponCode: string | null = null;
+
+    if (couponCode) {
+      const coupon = await db.userCoupon.findFirst({
+        where: {
+          code: couponCode.trim().toUpperCase(),
+          userId,
+          isUsed: false,
+          OR: [{ expiresAt: null }, { expiresAt: { gte: new Date() } }]
+        }
+      });
+
+      if (coupon) {
+        // Welcome coupon: only valid on first booking
+        if (coupon.couponType === CouponType.WELCOME) {
+          const priorBookings = await db.booking.count({
+            where: { userId, status: { not: 'CANCELLED' } }
+          });
+          if (priorBookings > 0) {
+            return res.status(400).json({
+              message: 'Welcome coupon is only valid on your very first booking.'
+            });
+          }
+        }
+
+        if (coupon.minBookingAmount && grossTotal < coupon.minBookingAmount) {
+          return res.status(400).json({
+            message: `Minimum booking amount of ₹${coupon.minBookingAmount} required for this coupon.`
+          });
+        }
+
+        discount = Math.round(calcDiscount(coupon, grossTotal));
+        appliedCouponId = coupon.id;
+        appliedCouponCode = coupon.code;
+      }
+    }
+
+    const finalPrice = Math.max(0, grossTotal - discount);
+
+    const booking = await db.booking.create({
       data: {
         userId,
         vehicleId,
         startDate: start,
         endDate: end,
-        totalPrice,
-        status: 'CONFIRMED',
-      },
+        totalPrice: finalPrice,
+        discount,
+        couponId: appliedCouponId,
+        couponCode: appliedCouponCode,
+        status: 'CONFIRMED'
+      }
     });
 
-    res.status(201).json(newBooking);
+    // Mark coupon used
+    if (appliedCouponId) {
+      await db.userCoupon.update({
+        where: { id: appliedCouponId },
+        data: { isUsed: true, usedAt: new Date() }
+      });
+    }
+
+    // Notify vehicle manager
+    await notifyManagerOfHandover(vehicleId, booking.id);
+
+    res.status(201).json({ ...booking, discount, appliedCouponCode });
   } catch (error) {
-    console.error("Booking Error:", error);
-    res.status(500).json({ message: "Internal Server Error during booking." });
+    console.error('Booking Error:', error);
+    res.status(500).json({ message: 'Internal Server Error during booking.' });
   }
 };
 
-// 2. GET USER BOOKINGS
+// ─── 2. GET USER BOOKINGS ─────────────────────────────────────────────────────
 export const getUserBookings = async (req: any, res: Response) => {
   try {
     const bookings = await db.booking.findMany({
       where: { userId: req.user.id },
-      include: {
-        vehicle: true,
-        review: true
-      },
+      include: { vehicle: true, review: true },
       orderBy: { startDate: 'desc' }
     });
 
-    const formattedBookings = bookings.map(b => ({
+    res.json(bookings.map(b => ({
       ...b,
       vehicle: {
         id: b.vehicle.id,
@@ -79,48 +141,46 @@ export const getUserBookings = async (req: any, res: Response) => {
         type: b.vehicle.type,
         image: b.vehicle.imageUrl || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf'
       }
-    }));
-
-    res.status(200).json(formattedBookings);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch bookings." });
+    })));
+  } catch {
+    res.status(500).json({ message: 'Failed to fetch bookings.' });
   }
 };
 
-// 3. CANCEL BOOKING
+// ─── 3. CANCEL BOOKING ────────────────────────────────────────────────────────
 export const cancelBooking = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
     const booking = await db.booking.findUnique({ where: { id } });
-
     if (!booking || booking.userId !== req.user.id) {
-      return res.status(403).json({ message: "Unauthorized to cancel this booking." });
+      return res.status(403).json({ message: 'Unauthorized to cancel this booking.' });
     }
 
-    const updated = await db.booking.update({
-      where: { id },
-      data: { status: 'CANCELLED' }
-    });
+    // Refund coupon on cancellation
+    if (booking.couponId) {
+      await db.userCoupon.update({
+        where: { id: booking.couponId },
+        data: { isUsed: false, usedAt: null }
+      }).catch(() => {});
+    }
 
-    res.status(200).json({ message: "Booking cancelled successfully", updated });
-  } catch (error) {
-    res.status(500).json({ message: "Cancellation failed." });
+    const updated = await db.booking.update({ where: { id }, data: { status: 'CANCELLED' } });
+    res.json({ message: 'Booking cancelled successfully', updated });
+  } catch {
+    res.status(500).json({ message: 'Cancellation failed.' });
   }
 };
 
-// 4. GET BOOKING HISTORY
+// ─── 4. GET BOOKING HISTORY ───────────────────────────────────────────────────
 export const getBookingHistory = async (req: any, res: Response) => {
   try {
     const history = await db.booking.findMany({
       where: { userId: req.user.id },
-      include: {
-        vehicle: true,
-        review: true
-      },
+      include: { vehicle: true, review: true },
       orderBy: { createdAt: 'desc' }
     });
 
-    const formattedHistory = history.map(b => ({
+    res.json(history.map(b => ({
       ...b,
       vehicle: {
         id: b.vehicle.id,
@@ -128,10 +188,8 @@ export const getBookingHistory = async (req: any, res: Response) => {
         type: b.vehicle.type,
         image: b.vehicle.imageUrl || 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf'
       }
-    }));
-
-    res.status(200).json(formattedHistory);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch booking history" });
+    })));
+  } catch {
+    res.status(500).json({ message: 'Failed to fetch booking history' });
   }
 };

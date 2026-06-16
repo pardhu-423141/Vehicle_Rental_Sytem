@@ -28,20 +28,16 @@ model User {
   password String
   role     Role   @default(USER)
 
-  // Verification Fields
   isVerified Boolean   @default(false)
   otp        String?
   otpExpires DateTime?
 
-  // Password Reset
   passwordResetToken   String?
   passwordResetExpires DateTime?
 
-  // KYC & Profile
   kycStatus KYCStatus @default(NOT_SUBMITTED)
   kycData   KYCData?
 
-  // Relations & Timestamps
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   bookings  Booking[]
@@ -53,6 +49,7 @@ model User {
   assignedIssues Issue[] @relation("AssignedToManager")
 
   statusLogs VehicleStatusLog[]
+  coupons    UserCoupon[]
 }
 
 enum VehicleType {
@@ -102,6 +99,10 @@ model Booking {
   endDate    DateTime
   totalPrice Float
   status     BookingStatus @default(PENDING)
+
+  couponId   String?
+  couponCode String?
+  discount   Float?  @default(0)
 
   user    User     @relation(fields: [userId], references: [id])
   vehicle Vehicle  @relation(fields: [vehicleId], references: [id])
@@ -225,6 +226,39 @@ model VehicleStatusLog {
 
   status String
   reason String?
+
+  createdAt DateTime @default(now())
+}
+
+// ─── COUPON SYSTEM ────────────────────────────────────────────────────────────
+
+enum CouponType {
+  WELCOME
+  MILESTONE
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+model UserCoupon {
+  id     String @id @default(uuid())
+  code   String @unique
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  couponType    CouponType
+  discountType  DiscountType @default(PERCENT)
+  discountValue Float // 10 = 10% or ₹10 fixed
+
+  maxDiscount      Float? // cap for PERCENT type (e.g. 200 → max ₹200 off)
+  minBookingAmount Float? // minimum booking amount required
+  conditions       String? // human-readable conditions text
+
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  expiresAt DateTime?
 
   createdAt DateTime @default(now())
 }

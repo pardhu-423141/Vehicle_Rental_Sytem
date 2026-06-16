@@ -37,6 +37,7 @@
     "@types/node": "^20.19.35",
     "@types/nodemailer": "^7.0.11",
     "@types/pg": "^8.18.0",
+    "@types/socket.io": "^3.0.1",
     "@types/streamifier": "^0.1.2",
     "drizzle-kit": "^0.18.1",
     "nodemon": "^3.0.3",

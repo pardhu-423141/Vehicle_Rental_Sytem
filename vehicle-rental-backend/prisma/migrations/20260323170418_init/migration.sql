@@ -1,5 +1,0 @@
--- AlterEnum
-ALTER TYPE "KYCStatus" ADD VALUE 'NOT_SUBMITTED';
-
--- AlterTable
-ALTER TABLE "User" ALTER COLUMN "kycStatus" SET DEFAULT 'NOT_SUBMITTED';
