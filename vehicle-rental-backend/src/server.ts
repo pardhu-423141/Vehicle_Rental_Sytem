@@ -38,7 +38,7 @@ app.get("/api/health", (req, res) => {
 
 // Middlewares
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CLIENT_URL,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -76,5 +76,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  console.log(`Server running at ${process.env.CLIENT_URL}`);
 });
