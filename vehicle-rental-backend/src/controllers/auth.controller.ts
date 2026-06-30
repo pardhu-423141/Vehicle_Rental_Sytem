@@ -106,11 +106,11 @@ export const loginUser = async (req: Request, res: Response) => {
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
 
-    res.cookie('auth_token', token, {
+    res.cookie("auth_token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     return res.json({
@@ -124,10 +124,10 @@ export const loginUser = async (req: Request, res: Response) => {
 
 /** LOGOUT USER */
 export const logoutUser = async (_req: Request, res: Response) => {
-  res.clearCookie('auth_token', {
+  res.clearCookie("auth_token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
   return res.json({ message: 'Logged out successfully' });
 };
