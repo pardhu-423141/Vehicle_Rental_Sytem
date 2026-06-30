@@ -5,7 +5,7 @@ import { UserPayload } from '../types'; // Import the interface we created above
 
 // 1. General Authentication (Checks if user is logged in)
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
-  const token = req.cookies.auth_token;
+  const token = req.cookies.auth_token || req.header('Authorization')?.replace(/^Bearer\s+/i, '');
 
   if (!token) {
     return res.status(401).json({ message: "Authentication required: Please log in" });

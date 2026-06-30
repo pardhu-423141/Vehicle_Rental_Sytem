@@ -18,9 +18,11 @@ export default function Login() {
     try {
       const res = await api.post('/auth/login', formData);
       const user = res.data.user;
+      const token = res.data.token;
 
-      if (!user) throw new Error('Login succeeded but user data was missing.');
+      if (!user || !token) throw new Error('Login succeeded but user data or token was missing.');
 
+      localStorage.setItem('auth_token', token);
       toast.success('Access Granted. Welcome back!');
       login(user);
 
