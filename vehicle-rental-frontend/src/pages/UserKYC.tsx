@@ -6,7 +6,7 @@ import {
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-
+const API_URL = import.meta.env.VITE_API_URL;
 export default function UserKYC() {
   const { user } = useAuth();
   const [userData, setUserData] = useState<any>(null);
@@ -98,7 +98,7 @@ export default function UserKYC() {
   const getImageUrl = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `http://localhost:5000${path.startsWith('/') ? '' : '/'}${path}`;
+    return `${API_URL}${path.startsWith('/') ? '' : '/'}${path}`;
   };
 
   if (loading) {

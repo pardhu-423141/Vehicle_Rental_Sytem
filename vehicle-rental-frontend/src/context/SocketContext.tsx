@@ -11,7 +11,7 @@ export interface AppNotification {
   isRead: boolean;
   meta?: Record<string, string>;
 }
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface SocketContextType {
   notifications: AppNotification[];
   unreadCount: number;
@@ -36,7 +36,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!user?.id) return;
 
-    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', {
+    const socket = io(import.meta.env.VITE_SOCKET_URL || `${API_URL}`, {
       withCredentials: true,
       transports: ['websocket', 'polling']
     });
