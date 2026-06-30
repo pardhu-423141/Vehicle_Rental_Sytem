@@ -10,7 +10,8 @@ import {
   getAllBookings,
   getRevenueReports, 
   getRecentTransactions  ,
-  getMaintenanceTasks, resolveMaintenance  
+  getMaintenanceTasks, resolveMaintenance, 
+  deactivateUser,reactivateUser
 } from '../controllers/admin.controller';
 
 import { getVehicles, addVehicle, removeVehicle, updateVehicle } from '../controllers/vehicle.controller';
@@ -72,5 +73,6 @@ router.put('/maintenance/:id/resolve', resolveMaintenance);
 
 // This is your existing one (keep it if you use it for bulk updates)
 router.patch('/vehicles/maintenance', toggleMaintenance);
-
+router.patch('/users/:id/deactivate', deactivateUser);
+router.patch('/users/:id/reactivate', reactivateUser);
 export default router;

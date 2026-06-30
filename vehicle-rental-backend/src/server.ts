@@ -25,7 +25,7 @@ const app = express();
 
 // 3. Middlewares
 app.use(cors({
-  origin: 'http://localhost:5173', // Replace with your Frontend URL (Vite/React)
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173', // Replace with your Frontend URL (Vite/React)
   credentials: true,               // Essential for sending JWT cookies
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']

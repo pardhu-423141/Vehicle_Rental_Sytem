@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
 
+
 // 1. GET ALL USERS (with Pagination)
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
@@ -345,5 +346,25 @@ export const getVehicleStatusLogs = async (req: Request, res: Response) => {
     res.status(200).json(logs);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch status logs." });
+  }
+};
+
+export const deactivateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.user.update({ where: { id }, data: { isActive: false } });
+    res.status(200).json({ message: 'User deactivated successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to deactivate user.' });
+  }
+};
+
+export const reactivateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await db.user.update({ where: { id }, data: { isActive: true } });
+    res.status(200).json({ message: 'User reactivated successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to reactivate user.' });
   }
 };

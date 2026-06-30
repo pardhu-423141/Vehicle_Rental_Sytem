@@ -20,8 +20,7 @@ const transporter = nodemailer.createTransport({
  */
 export const registerUser = async (req: Request, res: Response) => {
   try {
-    const { name, email, password } = req.body;
-
+    const { name, email, password, phone } = req.body;
     const existingUser = await db.user.findUnique({ where: { email } });
 
     if (existingUser) {
@@ -44,6 +43,7 @@ export const registerUser = async (req: Request, res: Response) => {
         name,
         email,
         password: hashedPassword,
+        phone: phone || null,   
         otp,
         otpExpires,
         isVerified: false,

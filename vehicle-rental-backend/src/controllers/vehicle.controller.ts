@@ -162,8 +162,11 @@ export const getVehicles = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const vehicles = await prisma.vehicle.findMany({
-      where: whereClause,
-      orderBy: { createdAt: 'desc' }
+      where: { deletedAt: null },
+      include: {
+        manager: { select: { id: true, name: true } },  
+      },
+      orderBy: { createdAt: 'desc' },
     });
     res.status(200).json(vehicles);
   } catch (error: any) {
