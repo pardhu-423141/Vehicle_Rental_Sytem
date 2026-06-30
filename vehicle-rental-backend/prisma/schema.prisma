@@ -1,97 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-enum Role {
-  USER
-  USER_MANAGER
-  VEHICLE_MANAGER
-  ADMIN
-}
-
-enum KYCStatus {
-  NOT_SUBMITTED
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 model User {
-  id       String @id @default(uuid())
-  email    String @unique
-  name     String
-  password String
-  role     Role   @default(USER)
-
-  // Verification Fields
-  isVerified Boolean   @default(false)
-  otp        String? // Stores the 6-digit code
-  otpExpires DateTime?
-
-  // KYC & Profile
-  kycStatus KYCStatus @default(NOT_SUBMITTED)
-  kycData   KYCData?
-
-  // Relations & Timestamps
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  bookings  Booking[]
-  reviews   Review[]
-
+  id              String             @id @default(uuid())
+  email           String             @unique
+  name            String
+  password        String
+  phone           String?
+  role            Role               @default(USER)
+  isVerified      Boolean            @default(false)
+  isActive        Boolean            @default(true)
+  otp             String?
+  otpExpires      DateTime?
+  kycStatus       KYCStatus          @default(NOT_SUBMITTED)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  bookings        Booking[]
+  assignedIssues  Issue[]            @relation("AssignedToManager")
+  reportedIssues  Issue[]            @relation("ReportedByAdmin")
+  kycData         KYCData?
+  reviews         Review[]
   managedVehicles Vehicle[]
-
-  reportedIssues Issue[] @relation("ReportedByAdmin")
-
-  assignedIssues Issue[] @relation("AssignedToManager")
-
-  statusLogs VehicleStatusLog[]
-}
-
-enum VehicleType {
-  TWO_WHEELER
-  FOUR_SEATER
-  FIVE_SEATER
-  SEVEN_SEATER
-  LUXURY
+  statusLogs      VehicleStatusLog[]
 }
 
 model Vehicle {
-  id           String  @id @default(uuid())
-  make         String // e.g., Toyota
-  model        String // e.g., Camry
-  year         Int
-  licensePlate String  @unique
-  color        String
-  fuelType     String // Petrol, Diesel, Electric
-  transmission String // Manual, Automatic
-  rentalRate   Float // Price per day/hour
-  imageUrl     String?
-
-  // --- NEW FIELDS ---
-  type            VehicleType @default(FIVE_SEATER)
-  seatingCapacity Int         @default(5)
-  // ------------------
-
-  status    String    @default("Available")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  bookings Booking[]
-  reviews  Review[]
-
-  // ⚡ ADD THESE TWO LINES:
-  managerId String? // Optional, because a new car might not be assigned immediately
-  manager   User?   @relation(fields: [managerId], references: [id])
-
-  // ⚡ ADD THIS LINE:
-  maintenanceTasks  MaintenanceTask[]
+  id                String             @id @default(uuid())
+  make              String
+  model             String
+  year              Int
+  licensePlate      String             @unique
+  color             String
+  fuelType          String
+  transmission      String
+  rentalRate        Float
+  imageUrl          String?
+  status            String             @default("Available")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  seatingCapacity   Int                @default(5)
+  type              VehicleType        @default(FIVE_SEATER)
+  managerId         String?
+  bookings          Booking[]
   issues            Issue[]
+  maintenanceTasks  MaintenanceTask[]
+  reviews           Review[]
+  manager           User?              @relation(fields: [managerId], references: [id])
   vehicleStatusLogs VehicleStatusLog[]
 }
 
@@ -103,20 +64,110 @@ model Booking {
   endDate    DateTime
   totalPrice Float
   status     BookingStatus @default(PENDING)
-
-  // Relations
-  user    User     @relation(fields: [userId], references: [id])
-  vehicle Vehicle  @relation(fields: [vehicleId], references: [id])
-  payment Payment? // One-to-one relationship with Payment
-
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
   handoverAt DateTime?
   returnAt   DateTime?
+  user       User          @relation(fields: [userId], references: [id])
+  vehicle    Vehicle       @relation(fields: [vehicleId], references: [id])
+  payment    Payment?
+  review     Review?
+}
 
+model Payment {
+  id            String        @id @default(uuid())
+  bookingId     String        @unique
+  amount        Float
+  paymentMethod String
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @unique
+  createdAt     DateTime      @default(now())
+  booking       Booking       @relation(fields: [bookingId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int
+  comment   String?
+  userId    String
+  vehicleId String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  bookingId String   @unique
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+}
 
-  // ⚡ ADD THIS LINE to tell Booking it has a Review!
-  review Review?
+model KYCData {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  idType       String
+  idNumber     String   @unique
+  idImageFront String
+  idImageBack  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+    rejectionReason String?
+}
+
+model MaintenanceTask {
+  id           String    @id @default(uuid())
+  issue        String
+  status       String    @default("Pending")
+  reportedDate DateTime  @default(now())
+  vehicleId    String
+  resolvedAt   DateTime?
+  vehicle      Vehicle   @relation(fields: [vehicleId], references: [id])
+}
+
+model Issue {
+  id                String      @id @default(uuid())
+  vehicleId         String
+  reportedByAdminId String
+  assignedManagerId String
+  description       String
+  response          String?
+  status            IssueStatus @default(OPEN)
+  createdAt         DateTime    @default(now())
+  resolvedAt        DateTime?
+  title             String
+  assignedManager   User        @relation("AssignedToManager", fields: [assignedManagerId], references: [id])
+  reportedByAdmin   User        @relation("ReportedByAdmin", fields: [reportedByAdminId], references: [id])
+  vehicle           Vehicle     @relation(fields: [vehicleId], references: [id])
+}
+
+model VehicleStatusLog {
+  id        String   @id @default(uuid())
+  vehicleId String
+  changedBy String
+  status    String
+  reason    String?
+  createdAt DateTime @default(now())
+  changer   User     @relation(fields: [changedBy], references: [id])
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+}
+
+enum Role {
+  USER
+  USER_MANAGER
+  VEHICLE_MANAGER
+  ADMIN
+}
+
+enum KYCStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NOT_SUBMITTED
+}
+
+enum VehicleType {
+  TWO_WHEELER
+  FOUR_SEATER
+  FIVE_SEATER
+  SEVEN_SEATER
+  LUXURY
 }
 
 enum BookingStatus {
@@ -127,20 +178,6 @@ enum BookingStatus {
   CANCELLED
 }
 
-model Payment {
-  id            String        @id @default(uuid())
-  bookingId     String        @unique
-  amount        Float
-  paymentMethod String // e.g., "STRIPE", "PAYPAL", "CREDIT_CARD"
-  status        PaymentStatus @default(PENDING)
-  transactionId String?       @unique // ID from the payment gateway
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id])
-
-  createdAt DateTime @default(now())
-}
-
 enum PaymentStatus {
   PENDING
   SUCCESS
@@ -148,91 +185,8 @@ enum PaymentStatus {
   REFUNDED
 }
 
-model Review {
-  id        String  @id @default(uuid())
-  rating    Int // 1 to 5
-  comment   String?
-  userId    String
-  vehicleId String
-
-  // Relations
-  user    User    @relation(fields: [userId], references: [id])
-  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  // ⚡ THIS IS THE MISSING HANDSHAKE:
-  bookingId String  @unique
-  booking   Booking @relation(fields: [bookingId], references: [id])
-}
-
-model KYCData {
-  id           String  @id @default(uuid())
-  userId       String  @unique
-  idType       String // e.g., "Driving License", "Passport"
-  idNumber     String  @unique
-  idImageFront String // URL to image storage (S3/Cloudinary)
-  idImageBack  String?
-
-  // Relations
-  user User @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// ADD THIS MODEL:
-model MaintenanceTask {
-  id           String   @id @default(uuid())
-  issue        String // The reason entered during return
-  status       String   @default("Pending") // Pending, In Progress, Resolved
-  reportedDate DateTime @default(now())
-
-  resolvedAt DateTime?
-
-  vehicleId String
-  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
-}
-
 enum IssueStatus {
   OPEN
   ACKNOWLEDGED
   RESOLVED
-}
-
-model Issue {
-  id String @id @default(uuid())
-
-  vehicleId String
-  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
-
-  reportedByAdminId String
-  reportedByAdmin   User   @relation("ReportedByAdmin", fields: [reportedByAdminId], references: [id])
-
-  assignedManagerId String
-  assignedManager   User   @relation("AssignedToManager", fields: [assignedManagerId], references: [id])
-
-  title       String
-  description String
-  response    String?
-
-  status IssueStatus @default(OPEN)
-
-  createdAt  DateTime  @default(now())
-  resolvedAt DateTime?
-}
-
-model VehicleStatusLog {
-  id String @id @default(uuid())
-
-  vehicleId String
-  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
-
-  changedBy String
-  changer   User   @relation(fields: [changedBy], references: [id])
-
-  status String
-  reason String?
-
-  createdAt DateTime @default(now())
 }
