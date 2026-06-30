@@ -39,10 +39,7 @@ app.get("/api/health", (req, res) => {
 // Middlewares
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      process.env.CORS_ORIGIN,
-    ],
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -53,7 +50,7 @@ app.use(express.json({
     req.rawBody = buf.toString(); // Saves the raw string for Razorpay webhooks
   }
 }));
-
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Routes
@@ -79,5 +76,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
-  console.log(`Server running at ${process.env.PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
