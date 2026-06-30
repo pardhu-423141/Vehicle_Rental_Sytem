@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, ShieldCheck, ShieldAlert, Eye, CheckCircle, XCircle, FileText, Loader2, X, ExternalLink } from 'lucide-react';
+import { Search, Eye, CheckCircle, XCircle, FileText, Loader2, X, ExternalLink } from 'lucide-react';
+
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 
 export default function KYCVerifications() {
+
   const [kycRequests, setKycRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,7 +17,7 @@ export default function KYCVerifications() {
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get('/admin/kyc/submissions'); 
+      const { data } = await api.get('/kyc/submissions');
       
       let extraction: any[] = [];
       if (Array.isArray(data)) extraction = data;
@@ -39,7 +41,7 @@ export default function KYCVerifications() {
   // 2. Handle Approve/Reject Action
   const handleAction = async (userId: string, userName: string, action: 'APPROVED' | 'REJECTED') => {
     try {
-      await api.patch(`/admin/kyc/review/${userId}`, { status: action });
+      await api.patch(`/kyc/review/${userId}`, { status: action });
       
       toast.success(`${userName}'s KYC has been ${action.toLowerCase()}!`);
       

@@ -1,47 +1,37 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, LogIn, ArrowRight } from 'lucide-react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 
 export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const { login } = useAuth();
+
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', formData, {
-        withCredentials: true // Important for cookies
-      });
-
+      const res = await api.post('/auth/login', formData);
       const user = res.data.user;
-      if (!user) {
-        throw new Error('Login succeeded but user data was missing.');
-      }
+
+      if (!user) throw new Error('Login succeeded but user data was missing.');
 
       toast.success('Access Granted. Welcome back!');
-
-      // Update your Auth Context (auth cookie is already set by backend)
       login(user);
 
-
-      // Navigate based on user role
       if (user.role === 'ADMIN') {
-        navigate('/admin/dashboard'); 
+        navigate('/admin/dashboard');
       } else if (user.role === 'USER_MANAGER') {
-        navigate('/user-manager/dashboard'); // <--- Sends them to our new page!
+        navigate('/user-manager/dashboard');
       } else if (user.role === 'VEHICLE_MANAGER') {
-        navigate('/manager/fleet'); 
+        navigate('/manager/fleet');
       } else {
-        navigate('/Userdashboard'); // Default for regular customers
+        navigate('/UserDashboard');
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Authorization failed');
@@ -51,14 +41,11 @@ export default function Login() {
   };
 
   return (
-    <div className="w-full min-h-screen flex items-center justify-center  p-4 font-sans relative overflow-hidden">
-      {/* Background Decorative Blobs - Identical to Register */}
+    <div className="w-full min-h-screen flex items-center justify-center p-4 font-sans relative overflow-hidden">
       <div className="absolute top-0 -left-4 w-72 h-72 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
       <div className="absolute bottom-0 -right-4 w-72 h-72 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
 
       <div className="w-full max-w-md bg-white/10 backdrop-blur-2xl border border-white/20 p-8 rounded-[2.5rem] shadow-2xl z-10 animate-in fade-in slide-in-from-bottom-10 duration-700">
-        
-        {/* Header */}
         <div className="text-center mb-10">
           <div className="inline-flex p-3 rounded-2xl bg-blue-500/20 border border-blue-500/30 text-blue-400 mb-4">
             <LogIn size={28} />
@@ -68,29 +55,33 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          <GlassInput 
-            icon={<Mail size={18} />} 
-            label="Fleet Email" 
-            type="email" 
-            placeholder="operator@nitap.ac.in" 
+          <GlassInput
+            icon={<Mail size={18} />}
+            label="Fleet Email"
+            type="email"
+            placeholder="operator@example.com"
             value={formData.email}
-            onChange={(v: string) => setFormData({...formData, email: v})}
+            onChange={(v: string) => setFormData({ ...formData, email: v })}
           />
-          
+
           <div className="relative">
-            <GlassInput 
-              icon={<Lock size={18} />} 
-              label="Access Key" 
-              type="password" 
-              placeholder="••••••••" 
+            <GlassInput
+              icon={<Lock size={18} />}
+              label="Access Key"
+              type="password"
+              placeholder="••••••••"
               value={formData.password}
-              onChange={(v: string) => setFormData({...formData, password: v})}
+              onChange={(v: string) => setFormData({ ...formData, password: v })}
             />
-            
+            <div className="text-right mt-1">
+              <Link to="/forgot-password" className="text-xs text-gray-400 hover:text-blue-400 transition-colors">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 group disabled:opacity-50 mt-4"
           >
@@ -112,7 +103,6 @@ export default function Login() {
   );
 }
 
-// Re-using your exact GlassInput helper component structure
 function GlassInput({ icon, label, type, placeholder, value, onChange }: any) {
   return (
     <div className="space-y-2">
@@ -121,8 +111,8 @@ function GlassInput({ icon, label, type, placeholder, value, onChange }: any) {
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors">
           {icon}
         </div>
-        <input 
-          type={type} 
+        <input
+          type={type}
           className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-gray-600 outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all text-sm"
           placeholder={placeholder}
           value={value}

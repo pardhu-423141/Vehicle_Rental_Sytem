@@ -27,29 +27,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const checkAuthStatus = async () => {
-      const hint = localStorage.getItem('fleet_user');
-      
-      if (!hint) {
-        setLoading(false);
-        return; 
-      }
-
       try {
-        const res = await api.get('/user/profile'); 
-        
-        // --- THE FIX STARTS HERE ---
-        // Safely unwrap the user object whether the backend sends { user: {...} } OR just {...}
+        const res = await api.get('/user/profile');
         const actualUser = res.data.user ? res.data.user : res.data;
-        
         setUser(actualUser);
-        localStorage.setItem('fleet_user', JSON.stringify(actualUser));
-        // --- THE FIX ENDS HERE ---
-
-      } catch (err) {
+      } catch {
         setUser(null);
-        localStorage.removeItem('fleet_user');
       } finally {
-        setLoading(false); 
+        setLoading(false);
       }
     };
 
@@ -58,17 +43,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = (userData: User) => {
     setUser(userData);
-    localStorage.setItem('fleet_user', JSON.stringify(userData));
   };
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout'); 
+      await api.post('/auth/logout');
     } catch (err) {
-      console.error("Logout Uplink Failed");
+      console.error("Logout failed");
     } finally {
       setUser(null);
-      localStorage.removeItem('fleet_user');
     }
   };
 
@@ -76,10 +59,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     <AuthContext.Provider value={{ user, login, logout, loading }}>
       {!loading ? children : (
         <div className="h-screen w-full flex items-center justify-center bg-[#0a0a0a]">
-           <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-              <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em]">Synchronizing Session...</p>
-           </div>
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+            <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em]">Synchronizing Session...</p>
+          </div>
         </div>
       )}
     </AuthContext.Provider>

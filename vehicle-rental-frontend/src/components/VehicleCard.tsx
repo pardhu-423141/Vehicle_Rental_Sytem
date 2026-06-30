@@ -1,5 +1,5 @@
 // VehicleCard.tsx
-import React from 'react';
+
 import { Settings, Trash2, BellRing, Users } from 'lucide-react';
 
 export interface Vehicle {
