@@ -415,35 +415,37 @@ export default function Checkout() {
         <div className="flex-1 space-y-6">
 
           {/* Date picker */}
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Clock className="text-blue-400" size={20} /> Rental Duration
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { label: 'Pick-up Date & Time', val: pickupDate, set: setPickupDate, min: new Date() },
-                { label: 'Drop-off Date & Time', val: dropoffDate, set: setDropoffDate, min: pickupDate || new Date() }
-              ].map(({ label, val, set, min }) => (
-                <div key={label} className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">{label}</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-4 top-3.5 text-gray-500 z-10" size={16} />
-                    <DatePicker
-                      selected={val}
-                      onChange={(d: any) => set(d)}
-                      showTimeSelect
-                      dateFormat="MMMM d, yyyy h:mm aa"
-                      minDate={min}
-                      filterDate={isDateAvailable}
-                      placeholderText="Select date & time"
-                      className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      wrapperClassName="w-full"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+<div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+  <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+    <Clock className="text-blue-400" size={20} /> Rental Duration
+  </h2>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {[
+      { label: 'Pick-up Date & Time', val: pickupDate, set: setPickupDate, min: new Date() },
+      { label: 'Drop-off Date & Time', val: dropoffDate, set: setDropoffDate, min: pickupDate || new Date() }
+    ].map(({ label, val, set, min }) => (
+      <div key={label} className="flex flex-col gap-2">
+        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">{label}</label>
+        <div className="relative">
+          <Calendar className="absolute left-4 top-3.5 text-gray-500 z-10" size={16} />
+          <DatePicker
+            selected={val}
+            onChange={(d: any) => set(d)}
+            showTimeSelect
+            dateFormat="MMMM d, yyyy h:mm aa"
+            minDate={min}
+            filterDate={isDateAvailable}
+            placeholderText="Select date & time"
+            className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            wrapperClassName="w-full"
+            // Highlighted Changes:
+            portalId="root-datepicker-portal" 
+          />
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
 
           {/* ── COUPON INPUT SECTION ── */}
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">

@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// ENUMS
+// ==========================================
+
 enum Role {
   USER
   USER_MANAGER
@@ -28,6 +32,47 @@ enum VehicleType {
   SEVEN_SEATER
   LUXURY
 }
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  ONGOING
+  COMPLETED
+  CANCELLED
+  // Restored to prevent migration failures with existing data
+  PENDING_PAYMENT
+  PAYMENT_FAILED
+  PAYMENT_CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+  // Restored to prevent migration failures with existing data
+  CANCELLED
+}
+
+enum IssueStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum CouponType {
+  WELCOME
+  MILESTONE
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+// ==========================================
+// MODELS
+// ==========================================
 
 model User {
   id                   String             @id @default(uuid())
@@ -102,23 +147,27 @@ model Booking {
   review     Review?
 }
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  ONGOING
-  COMPLETED
-  CANCELLED
-}
-
 model Payment {
   id            String        @id @default(uuid())
   bookingId     String        @unique
   amount        Float
-  paymentMethod String
+  paymentMethod String?
   status        PaymentStatus @default(PENDING)
   transactionId String?       @unique
   createdAt     DateTime      @default(now())
   booking       Booking       @relation(fields: [bookingId], references: [id])
+
+  // Restored columns to keep your existing data safe
+  baseAmount          Float?
+  taxAmount           Float?
+  discountAmount      Float?
+  cancellationFee     Float?
+  refundAmount        Float?
+  orderId             String?
+  paidAt              DateTime?
+  cancelledAt         DateTime?
+  refundStatus        String?
+  refundTransactionId String?
 }
 
 model Review {
@@ -132,13 +181,6 @@ model Review {
   booking   Booking  @relation(fields: [bookingId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
   vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
-}
-
-enum PaymentStatus {
-  PENDING
-  SUCCESS
-  FAILED
-  REFUNDED
 }
 
 model KYCData {
@@ -162,12 +204,6 @@ model MaintenanceTask {
   vehicleId    String
   resolvedAt   DateTime?
   vehicle      Vehicle   @relation(fields: [vehicleId], references: [id])
-}
-
-enum IssueStatus {
-  OPEN
-  ACKNOWLEDGED
-  RESOLVED
 }
 
 model Issue {
@@ -197,29 +233,19 @@ model VehicleStatusLog {
   vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
 }
 
-enum CouponType {
-  WELCOME
-  MILESTONE
-}
-
-enum DiscountType {
-  PERCENT
-  FIXED
-}
-
 model UserCoupon {
-  id               String    @id @default(uuid())
-  code             String    @unique
+  id               String       @id @default(uuid())
+  code             String       @unique
   userId           String
-  user             User      @relation(fields: [userId], references: [id])
+  user             User         @relation(fields: [userId], references: [id])
   couponType       CouponType
   discountType     DiscountType @default(PERCENT)
   discountValue    Float
   maxDiscount      Float?
   minBookingAmount Float?
   conditions       String?
-  isUsed           Boolean   @default(false)
+  isUsed           Boolean      @default(false)
   usedAt           DateTime?
   expiresAt        DateTime?
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime     @default(now())
 }

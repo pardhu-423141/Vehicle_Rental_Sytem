@@ -74,27 +74,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
   }
 };
 
-// 4. DEACTIVATE USER (sets isVerified: false)
-export const deactivateUser = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  try {
-    await db.user.update({ where: { id }, data: { isVerified: false } });
-    res.status(200).json({ message: "User deactivated." });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to deactivate user." });
-  }
-};
 
-// 5. REACTIVATE USER (sets isVerified: true)
-export const reactivateUser = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  try {
-    await db.user.update({ where: { id }, data: { isVerified: true } });
-    res.status(200).json({ message: "User reactivated." });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to reactivate user." });
-  }
-};
 
 // 6. GET ADMIN DASHBOARD STATS
 export const getDashboardStats = async (req: Request, res: Response) => {
