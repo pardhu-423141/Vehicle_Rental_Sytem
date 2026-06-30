@@ -29,6 +29,13 @@ const httpServer = http.createServer(app);
 // Init Socket.io
 initSocket(httpServer);
 
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    message: "Server is running",
+  });
+});
+
 // Middlewares
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
