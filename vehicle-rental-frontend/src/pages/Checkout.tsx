@@ -114,16 +114,27 @@ export default function Checkout() {
     if (grossTotal > 0 && showCouponModal) fetchCoupons();
   }, [grossTotal, showCouponModal]);
 
-  // Close modal on outside click
+  // Close modal on outside click (use currentTarget-safe check)
   useEffect(() => {
+    if (!showCouponModal) return;
+
     const handler = (e: MouseEvent) => {
-      if (couponModalRef.current && !couponModalRef.current.contains(e.target as Node)) {
-        setShowCouponModal(false);
-      }
+      const el = couponModalRef.current;
+      if (!el) return;
+      const target = e.target as Node | null;
+      if (target && !el.contains(target)) setShowCouponModal(false);
     };
-    if (showCouponModal) document.addEventListener('mousedown', handler);
+
+    document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showCouponModal]);
+
+
+
+
+
+
+
 
 
   const fetchCoupons = async () => {
@@ -173,19 +184,81 @@ export default function Checkout() {
 
   const handleConfirmBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pickupDate || !dropoffDate || totalDays <= 0) { toast.error('Please select valid dates.'); return; }
+    if (!pickupDate || !dropoffDate || totalDays <= 0) {
+      toast.error('Please select valid dates.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const res = await api.post('/bookings/', {
+      // 1) Create booking as PENDING
+      const bookingRes = await api.post('/bookings/', {
         vehicleId: id,
         startDate: pickupDate.toISOString(),
         endDate: dropoffDate.toISOString(),
         couponCode: appliedCoupon?.code
       });
-      setSavedAmount(res.data.discount || 0);
-      setShowConfirmModal(true);
+
+      const booking = bookingRes.data;
+      setSavedAmount(booking.discount || 0);
+
+      // 2) Create Razorpay order
+      const payRes = await api.post('/payments/razorpay/create-order', {
+        bookingId: booking.id,
+        amount: booking.totalPrice
+      });
+
+      const { key_id, order_id, amount } = payRes.data;
+
+      // 3) Open Razorpay checkout popup
+      const options = {
+        key: key_id,
+        amount,
+        currency: 'INR',
+        name: 'Vehicle Rental System',
+        description: 'Vehicle booking payment',
+        order_id,
+        handler: function () {
+          // Webhook is source of truth; just show user a pending message.
+          setShowConfirmModal(true);
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: ''
+        },
+        notes: { bookingId: booking.id },
+        theme: { color: '#2563eb' }
+      };
+
+      // Load Razorpay script dynamically to avoid cross-origin runtime issues.
+      const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+        if (existing) return resolve();
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Failed to load Razorpay script'));
+        document.body.appendChild(s);
+      });
+
+      await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const RazorpayCtor = (window as any).Razorpay;
+      if (!RazorpayCtor) {
+        toast.error('Razorpay failed to load.');
+        return;
+      }
+
+      const rzp = new RazorpayCtor(options);
+      rzp.on('payment.failed', function () {
+        toast.error('Payment failed. Please try again.');
+      });
+      rzp.open();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Booking failed. Please try again.');
+      toast.error(err.response?.data?.message || 'Payment failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -525,7 +598,7 @@ export default function Checkout() {
               </div>
             )}
 
-            <button
+          <button
               onClick={handleConfirmBooking}
               disabled={totalDays <= 0 || submitting}
               className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
@@ -535,7 +608,7 @@ export default function Checkout() {
               }`}
             >
               {submitting ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
-              {submitting ? 'Processing...' : 'Confirm & Book'}
+              {submitting ? 'Processing...' : 'Confirm & Pay'}
             </button>
           </div>
         </div>

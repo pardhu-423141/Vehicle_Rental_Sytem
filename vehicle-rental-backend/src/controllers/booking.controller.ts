@@ -102,20 +102,12 @@ export const createBooking = async (req: any, res: Response) => {
         discount,
         couponId: appliedCouponId,
         couponCode: appliedCouponCode,
-        status: 'CONFIRMED'
+        // Payment-first flow: confirm only after Razorpay webhook success
+        status: 'PENDING'
       }
     });
 
-    // Mark coupon used
-    if (appliedCouponId) {
-      await db.userCoupon.update({
-        where: { id: appliedCouponId },
-        data: { isUsed: true, usedAt: new Date() }
-      });
-    }
-
-    // Notify vehicle manager
-    await notifyManagerOfHandover(vehicleId, booking.id);
+    // NOTE: Coupon usage + manager notification moved to Razorpay webhook (payment.controller.ts)
 
     res.status(201).json({ ...booking, discount, appliedCouponCode });
   } catch (error) {

@@ -18,6 +18,7 @@ import operationsRoutes from './routes/operationsRoutes';
 import issueRoutes from './routes/issue.routes';
 import staffRoutes from './routes/staff.routes';
 import couponRoutes from './routes/coupon.routes';
+import paymentRoutes from './routes/payment.routes';
 
 import './config/db';
 import './config/cron';
@@ -35,6 +36,13 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf.toString(); // Saves the raw string for Razorpay webhooks
+  }
+}));
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -51,6 +59,7 @@ app.use('/api/user-manager', userManagerRoutes);
 app.use('/api/operations', operationsRoutes);
 app.use('/api/issues', issueRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
