@@ -8,7 +8,6 @@
 [![Frontend](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](./vehicle-rental-frontend)
 [![Backend](https://img.shields.io/badge/Express-TypeScript-000000?style=for-the-badge&logo=express&logoColor=white)](./vehicle-rental-backend)
 [![Database](https://img.shields.io/badge/PostgreSQL-Prisma-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](./vehicle-rental-backend/prisma/schema.prisma)
-[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](#license)
 
 **🌐 Live:** [https://vehicle-rental-sytem-1.vercel.app/](https://vehicle-rental-sytem-1.vercel.app/)
 
@@ -34,7 +33,6 @@
 - [Deployment](#deployment)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -336,12 +334,6 @@ Contributions are welcome!
 5. Open a Pull Request
 
 Please keep PRs focused and update documentation when behaviour changes.
-
----
-
-## License
-
-Distributed under the **MIT License**. See `LICENSE` for details.
 
 ---
 
